@@ -12,48 +12,54 @@ import os
 import feather
 from pathlib import Path
 
+import urllib
+import shutil
+
 table_dir = os.path.join('data','table')
 
+csv_table = os.path.join(table_dir, 'csv')
+feather_table = os.path.join(table_dir, 'feather')
+os.makedirs(csv_table, exist_ok=True)
+os.makedirs(feather_table, exist_ok=True)
+
+csv_adtd = os.path.join('data', 'aggProfiles', 'csv')
+feather_adtd = os.path.join('data', 'aggProfiles', 'feather')
+os.makedirs(csv_adtd, exist_ok=True)
+os.makedirs(feather_adtd, exist_ok=True)
+
 def appData():
-           
-    csv_table = os.path.join(table_dir, 'csv')
-    feather_table = os.path.join(table_dir, 'feather')
-    os.makedirs(csv_table, exist_ok=True)
-    os.makedirs(feather_table, exist_ok=True)
-    
-    csv_adtd = os.path.join('data', 'aggProfiles', 'csv')
-    feather_adtd = os.path.join('data', 'aggProfiles', 'feather')
-    os.makedirs(csv_adtd, exist_ok=True)
-    os.makedirs(feather_adtd, exist_ok=True)
     
     #fetch tables from energydata.uct.ac.za
     apikey = input('Enter your APIKEY from http://energydata.uct.ac.za/user/YOUR_USERNAME: ')
+    headers = {'Authorization':apikey}
     ckan = ckanapi.RemoteCKAN('http://energydata.uct.ac.za/', apikey=apikey, get_only=True)
 
     tables = ckan.action.package_show(id='dlr-database-tables-94-14')        
     for i in range(0, len(tables['resources'])):
-            name = tables['resources'][i]['name']
-            print('... fetching ' + name + ' from energydata.uct.ac.za')
-            r_id = tables['resources'][i]['id']
-            d = ckan.action.datastore_search(resource_id=r_id)['records']
-            table = pd.DataFrame(d)
-            table = table.iloc[:,:-1]
-            
-            feather.write_dataframe(table, os.path.join(feather_table, name + '.feather'))
-            table.to_csv(os.path.join(csv_table, name + '.csv'), index=False)
+        name = tables['resources'][i]['name']
+        print('... fetching ' + name + ' from energydata.uct.ac.za')
+        r_url = tables['resources'][i]['url']
+        # Download resources from data portal
+        request = urllib.request.Request(r_url, headers = headers)
+        with urllib.request.urlopen(request) as response, open(os.path.join(csv_table, name + '.csv'), 'wb') as out_file:
+            shutil.copyfileobj(response, out_file)            
+        table = pd.read_csv(os.path.join(csv_table, name + '.csv'))            
+        #write profiles to disk                
+        feather.write_dataframe(table, os.path.join(feather_table, name + '.feather'))
     
     profiles = ckan.action.package_show(id='dlr-average-day-type-demand-profiles')        
     for i in range(0, len(profiles['resources'])):
-            name = profiles['resources'][i]['name']
-            print('... fetching ' + profiles['resources'][i]['name'] + ' from energydata.uct.ac.za')
-            r_id = profiles['resources'][i]['id']
-            d = ckan.action.datastore_search(resource_id=r_id)['records']
-            adtd = pd.DataFrame(d)
-            #write profiles to disk                
-            feather.write_dataframe(adtd, os.path.join(feather_adtd, name + '.feather'))
-            adtd.to_csv(os.path.join(csv_adtd, name + '.csv'), index=False)
+        name = profiles['resources'][i]['name']
+        print('... fetching ' + profiles['resources'][i]['name'] + ' from energydata.uct.ac.za')
+        r_url = profiles['resources'][i]['url']
+        # Download resources from data portal
+        request = urllib.request.Request(r_url, headers = headers)
+        with urllib.request.urlopen(request) as response, open(os.path.join(csv_adtd, name + '.csv'), 'wb') as out_file:
+            shutil.copyfileobj(response, out_file)
+        adtd = pd.read_csv(os.path.join(csv_adtd, name + '.csv'))
+        #write profiles to disk                
+        feather.write_dataframe(adtd, os.path.join(feather_adtd, name + '.feather'))
 
-    print('Your app is starting now. Go to 127.0.0.0:8050')
     return
 
 def readAggProfiles(year):
@@ -62,7 +68,7 @@ def readAggProfiles(year):
     """
     path = os.path.join('data', 'aggProfiles', 'feather')
     
-    if os.listdir(path) == []:
+    if len(os.listdir(path)) != 21:
         appData()
     
     else:         

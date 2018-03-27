@@ -19,23 +19,27 @@ import base64
 import features
 from support import appProfiles
 
+# Load images
 erc_logo = os.path.join('img', 'erc_logo.jpg')
 erc_encoded = base64.b64encode(open(erc_logo, 'rb').read())
 sanedi_logo = os.path.join('img', 'sanedi_logo.jpg')
 sanedi_encoded = base64.b64encode(open(sanedi_logo, 'rb').read())
 
-# Load datasets
-site_geo = pd.read_csv('data/site_geo.csv')
-site_geo.rename(columns={'GPSName':'Location'}, inplace=True)
-ids = features.loadID()
-ids_summary = ids.groupby(['Year','LocName','GroupID'])['id'].count().reset_index()
-ids_summary.rename(columns={'GroupID':'GroupId', 'id':'# households'}, inplace=True)
-loc_summary = site_geo.merge(ids_summary[['GroupId','# households']], on='GroupId')
-
+# Get mapbox token
 mapbox_access_token = 'pk.eyJ1Ijoic2FpbnRseXZpIiwiYSI6ImNqZHZpNXkzcjFwejkyeHBkNnp3NTkzYnQifQ.Rj_C-fOaZXZTVhTlliofMA'
 
 # Get load profile data from diskapp
 data = appProfiles()
+
+# Load datasets
+site_geo = features.loadTable('groups')
+#site_geo.rename(columns={'GPSName':'Location'}, inplace=True)
+ids = features.loadID()
+ids_summary = ids[ids.AnswerID!=0].groupby(['Year','LocName','GroupID'])['AnswerID'].count().reset_index()
+ids_summary.rename(columns={'AnswerID':'# households'}, inplace=True)
+loc_summary = site_geo.merge(ids_summary[['GroupID','# households']], on='GroupID')
+
+print('Your app is starting now. Visit 127.0.0.1:8050 in your browser')
 
 app = dash.Dash()
 app.config['suppress_callback_exceptions']=True
@@ -112,7 +116,7 @@ app.layout = html.Div([
                     id='output-location-list',
                     rows=[{}], # initialise the rows
                     row_selectable=False,
-                    columns = ['Year','Province','Municipality','Location','# households'],
+                    columns = ['Year','Province','Municipality','LocName','# households'],
                     filterable=True,
                     sortable=True,
                     column_widths=100,
@@ -273,7 +277,7 @@ app.layout = html.Div([
 def update_locations(input_years):
     dff = pd.DataFrame()
     for y in range(input_years[0], input_years[1]+1):
-        df = loc_summary.loc[loc_summary.Year.astype(int) == y, ['Year','Province','Municipality','Location', '# households']]
+        df = loc_summary.loc[loc_summary.Year.astype(int) == y, ['Year','Province','Municipality','LocName', '# households']]
         dff = dff.append(df)
     dff.reset_index(inplace=True, drop=True)
     return dff.to_dict('records')
@@ -301,7 +305,7 @@ def update_questions(search_word, surveys):
 def update_map(input_locations):
 
     loc_list = pd.DataFrame(input_locations)
-    keys=['Year','Location']
+    keys=['Year','LocName']
     i_loc = loc_list.set_index(keys).index
     i_site = loc_summary.set_index(keys).index
     
@@ -311,7 +315,7 @@ def update_map(input_locations):
     for y in range(georef.Year.min(), georef.Year.max()+1):
         lat = georef.loc[(georef.Year==y), 'Lat']
         lon = georef.loc[(georef.Year==y), 'Long']
-        text = georef.loc[(georef.Year==y), 'Location'] + ', ' + georef.loc[(georef.Year==y), 'Municipality']
+        text = georef.loc[(georef.Year==y), 'LocName'] + ', ' + georef.loc[(georef.Year==y), 'Municipality']
 #        marker_size = site_geo.loc[site_geo.Year==y,'# households']
         trace=go.Scattermapbox(
                 name=y,
@@ -333,8 +337,8 @@ def update_map(input_locations):
                     accesstoken=mapbox_access_token,
                     bearing=0,
                     center=dict(
-                        lat=site_geo[site_geo.Location=='Ikgomotseng'] ['Lat'].unique()[0],
-                        lon=site_geo[site_geo.Location=='Ikgomotseng']['Long'].unique()[0]
+                        lat=site_geo[site_geo.LocName=='Ikgomotseng'] ['Lat'].unique()[0],
+                        lon=site_geo[site_geo.LocName=='Ikgomotseng']['Long'].unique()[0]
                     ),
                     pitch=0,
                     zoom=4.2,
@@ -364,7 +368,7 @@ def update_locqu_summary(loc_rows, qu_selected_ix, qu_rows, summarise):
 
     locations = pd.DataFrame(loc_rows)
     years = locations.Year.unique()
-    idselect = ids.loc[(ids.Year.isin(years)) & (ids.LocName.isin(locations.Location.unique())), ['id','Year','LocName']]
+    idselect = ids.loc[(ids.Year.isin(years)) & (ids.LocName.isin(locations.LocName.unique())), ['id','Year','LocName']]
     idselect.reset_index(inplace=True, drop=True)
     
     searchterms = list(pd.DataFrame(qu_rows).loc[qu_selected_ix, 'Question'])
