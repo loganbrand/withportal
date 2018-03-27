@@ -28,16 +28,13 @@ sanedi_encoded = base64.b64encode(open(sanedi_logo, 'rb').read())
 # Get mapbox token
 mapbox_access_token = 'pk.eyJ1Ijoic2FpbnRseXZpIiwiYSI6ImNqZHZpNXkzcjFwejkyeHBkNnp3NTkzYnQifQ.Rj_C-fOaZXZTVhTlliofMA'
 
-# Get load profile data from diskapp
+# Get load profile data from disk
 data = appProfiles()
 
 # Load datasets
-site_geo = features.loadTable('groups')
-#site_geo.rename(columns={'GPSName':'Location'}, inplace=True)
 ids = features.loadID()
-ids_summary = ids[ids.AnswerID!=0].groupby(['Year','LocName','GroupID'])['AnswerID'].count().reset_index()
-ids_summary.rename(columns={'AnswerID':'# households'}, inplace=True)
-loc_summary = site_geo.merge(ids_summary[['GroupID','# households']], on='GroupID')
+loc_summary = ids[ids.AnswerID!=0].groupby(['Year','LocName','GroupID'])['AnswerID'].count().reset_index()
+loc_summary.rename(columns={'AnswerID':'# households'}, inplace=True)
 
 print('Your app is starting now. Visit 127.0.0.1:8050 in your browser')
 
@@ -337,8 +334,8 @@ def update_map(input_locations):
                     accesstoken=mapbox_access_token,
                     bearing=0,
                     center=dict(
-                        lat=site_geo[site_geo.LocName=='Ikgomotseng'] ['Lat'].unique()[0],
-                        lon=site_geo[site_geo.LocName=='Ikgomotseng']['Long'].unique()[0]
+                        lat=loc_summary[loc_summary.LocName=='Ikgomotseng'] ['Lat'].unique()[0],
+                        lon=loc_summary[loc_summary.LocName=='Ikgomotseng']['Long'].unique()[0]
                     ),
                     pitch=0,
                     zoom=4.2,
@@ -393,6 +390,21 @@ def update_locqu_summary(loc_rows, qu_selected_ix, qu_rows, summarise):
         locqu_summary.reset_index(inplace=True)
         
     return locqu_summary.to_dict('records')
+
+@app.callback(
+        Output(),
+        [Input('output-location-list','rows')
+        ]
+        )
+def graph_profiles(input_locations):
+
+#TODO first filter by answerID based on questions, then by profileid
+    loc_list = pd.DataFrame(input_locations)
+    years = loc_list.Year.unique()
+    locs = loc_list.LocName.unique()
+    g = data[(data.ProfileID_i.isin(ids.loc[(ids.Year.isin(years))&(ids.LocName.isin(locs))&(ids.AnswerID!=0),'ProfileID']))]
+    
+    return g
 
 # Run app from script. Go to 127.0.0.1:8050 to view
 if __name__ == '__main__':

@@ -87,3 +87,5 @@ def appProfiles():
     for y in range(1994, 2015):
         d = readAggProfiles(y)
         data = data.append(d)
+        
+    return data
