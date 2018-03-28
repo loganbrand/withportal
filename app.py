@@ -11,8 +11,13 @@ import dash_core_components as dcc
 import dash_html_components as html
 import dash_table_experiments as dt
 from dash.dependencies import Input, Output#, State
+
 import plotly.graph_objs as go
+#import plotly.offline as offline
+#offline.init_notebook_mode(connected=True)
+
 import pandas as pd
+import numpy as np
 import os
 import base64
 
@@ -29,11 +34,13 @@ sanedi_encoded = base64.b64encode(open(sanedi_logo, 'rb').read())
 mapbox_access_token = 'pk.eyJ1Ijoic2FpbnRseXZpIiwiYSI6ImNqZHZpNXkzcjFwejkyeHBkNnp3NTkzYnQifQ.Rj_C-fOaZXZTVhTlliofMA'
 
 # Get load profile data from disk
-data = appProfiles()
+print('...loading load profile data...')
+profiles = appProfiles()
 
+print('...loading socio demographic data...')
 # Load datasets
 ids = features.loadID()
-loc_summary = ids[ids.AnswerID!=0].groupby(['Year','LocName','GroupID'])['AnswerID'].count().reset_index()
+loc_summary = ids[ids.AnswerID!=0].groupby(['Year','LocName','Lat','Long','Municipality','Province'])['AnswerID'].count().reset_index()
 loc_summary.rename(columns={'AnswerID':'# households'}, inplace=True)
 
 print('Your app is starting now. Visit 127.0.0.1:8050 in your browser')
@@ -211,7 +218,25 @@ app.layout = html.Div([
         ],
             className='row'
         ),
-        html.Hr(),        
+        html.Hr(),
+        html.Div([
+            html.Div([
+                dcc.Graph(
+                    id='graph-profiles'
+                ),
+                dcc.RangeSlider(
+                    id = 'input-months',
+                    marks=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+                    min=1,
+                    max=12,
+                    step=1,
+                    included=True,
+                    value= [1,12],
+                    updatemode='drag',
+                    dots = True
+                )       
+            ])
+        ]),        
         html.Div([
             html.H3('Download Data'
             ),
@@ -392,19 +417,67 @@ def update_locqu_summary(loc_rows, qu_selected_ix, qu_rows, summarise):
     return locqu_summary.to_dict('records')
 
 @app.callback(
-        Output(),
-        [Input('output-location-list','rows')
+        Output('graph-profiles','figure'),
+        [Input('output-location-list','rows'),
+         Input('input_months','value')
         ]
         )
-def graph_profiles(input_locations):
+def graph_profiles(input_locations, selected_months):
 
 #TODO first filter by answerID based on questions, then by profileid
     loc_list = pd.DataFrame(input_locations)
     years = loc_list.Year.unique()
     locs = loc_list.LocName.unique()
-    g = data[(data.ProfileID_i.isin(ids.loc[(ids.Year.isin(years))&(ids.LocName.isin(locs))&(ids.AnswerID!=0),'ProfileID']))]
+    months=['January','February','March','April','May','June','July','August','September','October','November','December']
+
+    g = profiles[(profiles.ProfileID_i.isin(ids.loc[(ids.Year.isin(years))&(ids.LocName.isin(locs))&(ids.AnswerID!=0),'ProfileID']))]
+    gg = g.groupby(['daytype','month','hour'])['kw_mean'].mean().reset_index()
+
+    for i in ['Weekday']:#gg.daytype.unique():
+        
+        dt_mean = gg[(gg.daytype==i)&gg.month.isin(selected_months)]
+#        dt_profiles = g[(g.daytype==i)&g.month.isin(selected_months)]
     
-    return g
+        dt_mean['tix'] = 24*(dt_mean.month-selected_months[0]) + dt_mean.hour
+        dt_mean['tixnames'] = dt_mean.apply(lambda x: 'mean demand'+'<br />'+months[int(x.month)-1]+' '+ str(int(x.hour))+'h00', axis=1)
+        
+#        dt_profiles['tix'] = 24*(dt_profiles.month-1) + dt_profiles.hour
+#        dt_profiles['tixnames'] = dt_profiles.apply(lambda x: 'mean demand'+'<br />Month '+str(int(x.month))+'<br />'+str(int(x.hour))+'h00', axis=1)
+        data = []
+        
+        for m in range(0, len(months)+1):
+        
+            trace = go.Scatter(
+                showlegend=True,
+                opacity=1,
+                x=dt_mean.loc[dt_mean['month']==m, 'hour'],#'tix'],
+                y=dt_mean.loc[dt_mean['month']==m, 'kw_mean'],
+                mode='lines',
+                name=months[m-1],
+                line=dict(
+                    #color='red',
+                    width=1.5),
+                hoverinfo = 'name+y'
+            )
+            data.append(trace)
+        
+        layout = go.Layout(showlegend=True, 
+            title= i + ' Average Daily Demand for Selected Locations',
+            margin = dict(t=150,r=150,b=50,l=150),
+            height = 400,
+            yaxis = dict(
+                    title = 'mean hourly demand (kW)',
+                    ticksuffix=' kW'),
+            xaxis = dict(                        
+                    title = 'time of day',
+                    ticktext = dt_mean['hour'].unique(),#[months[i-1] for i in selected_months],
+                    tickvals = dt_mean['hour'].unique(),#np.arange(12, (len(selected_months)*24), 24),
+#                    ticks = "",
+                    showgrid = False)
+                    )
+        fig = go.Figure(data=data, layout=layout)   
+    
+    return fig
 
 # Run app from script. Go to 127.0.0.1:8050 to view
 if __name__ == '__main__':
