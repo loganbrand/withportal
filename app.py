@@ -13,8 +13,8 @@ import dash_table_experiments as dt
 from dash.dependencies import Input, Output#, State
 
 import plotly.graph_objs as go
-#import plotly.offline as offline
-#offline.init_notebook_mode(connected=True)
+import plotly.offline as offline
+offline.init_notebook_mode(connected=True)
 
 import pandas as pd
 import numpy as np
@@ -22,7 +22,7 @@ import os
 import base64
 
 import features
-from support import appProfiles
+from support import readAggProfiles #appProfiles, 
 
 # Load images
 erc_logo = os.path.join('img', 'erc_logo.jpg')
@@ -32,10 +32,6 @@ sanedi_encoded = base64.b64encode(open(sanedi_logo, 'rb').read())
 
 # Get mapbox token
 mapbox_access_token = 'pk.eyJ1Ijoic2FpbnRseXZpIiwiYSI6ImNqZHZpNXkzcjFwejkyeHBkNnp3NTkzYnQifQ.Rj_C-fOaZXZTVhTlliofMA'
-
-# Get load profile data from disk
-print('...loading load profile data...')
-profiles = appProfiles()
 
 print('...loading socio demographic data...')
 # Load datasets
@@ -101,7 +97,7 @@ app.layout = html.Div([
                         max=2014,
                         step=1,
                         included=True,
-                        value= [1994, 2014],
+                        value= [2012, 2014],
                         updatemode='drag',
                         dots = True
                     )       
@@ -140,6 +136,35 @@ app.layout = html.Div([
         ],
             className='row',
         ),
+        html.Hr(),
+        html.Div([
+            html.Div([
+                html.H3('View Load Profiles'),
+                dcc.RadioItems(
+                    id = 'input-daytype',
+                    options=[
+                            {'label': 'Weekday', 'value': 'Weekday'},
+                            {'label': 'Saturday', 'value': 'Saturday'},
+                            {'label': 'Sunday', 'value': 'Sunday'}
+                            ],
+                    value='Weekday'
+                ),
+                dcc.Graph(
+                    id='graph-profiles'
+                ),
+#                dcc.RangeSlider(
+#                    id = 'input-months',
+#                    marks=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+#                    min=0,
+#                    max=11,
+#                    step=1,
+#                    included=True,
+#                    value= [5,7],
+#                    updatemode='drag',
+#                    dots = True
+#                )       
+            ])
+        ]),                        
         html.Hr(),
         html.Div([ 
             html.Div([
@@ -217,64 +242,6 @@ app.layout = html.Div([
             )
         ],
             className='row'
-        ),
-        html.Hr(),
-        html.Div([
-            html.Div([
-                dcc.Graph(
-                    id='graph-profiles'
-                ),
-                dcc.RangeSlider(
-                    id = 'input-months',
-                    marks=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
-                    min=1,
-                    max=12,
-                    step=1,
-                    included=True,
-                    value= [1,12],
-                    updatemode='drag',
-                    dots = True
-                )       
-            ])
-        ]),        
-        html.Div([
-            html.H3('Download Data'
-            ),
-            html.Div([
-                html.Label('Select year range'
-                ),
-                dcc.RangeSlider(
-                    id = 'input-years-download',
-                    marks={i: i for i in range(1994, 2015, 2)},
-                    min=1994,
-                    max=2014,
-                    step=1,
-                    value=[2011, 2011],
-#                    dots = True,
-#                    included=True
-                )
-            ],
-                className='seven columns',
-                style={'margin-bottom': '50'}
-            ),
-            html.P(),
-            html.Div([
-                html.Label('Specify comma-separated list of search terms to select question responses'
-                ),
-                dcc.Input(
-                    id='search-list',
-                    placeholder='search term',
-                    type='text',
-                    value=''
-                )
-            ],
-                className='seven columns',
-                style={'margin-bottom': '10'}
-            )
-        ],
-            className='container',
-            style={'margin': 10,
-                   'padding': 0}
         ),
     ],
     #Set the style for the overall dashboard
@@ -416,66 +383,94 @@ def update_locqu_summary(loc_rows, qu_selected_ix, qu_rows, summarise):
         
     return locqu_summary.to_dict('records')
 
+#@app.callback(
+#        Output('preload-profiles','children'),
+#        [Input('profiles-button','n_clicks'),
+#         Input('output-location-list','rows')
+#        ]
+#        )
+#def preload_profiles(nclicks, input_locations):
+#
+#    loc_list = pd.DataFrame(input_locations)
+#    years = loc_list.Year.unique()
+#    
+## Get load profile data from disk
+#    print('...loading load profile data...')
+#    profiles = pd.DataFrame()
+#    for y in years:
+#        d = readAggProfiles(y)
+#        profiles = profiles.append(d)    
+##    profiles = appProfiles(yearstart, yearend) 
+#
+#    return profiles.to_feather() 
+
 @app.callback(
         Output('graph-profiles','figure'),
         [Input('output-location-list','rows'),
-         Input('input_months','value')
+         Input('input-daytype','value')
+#         Input('profiles-button','n_clicks')
+#         Input('preload-profiles','children')
         ]
         )
-def graph_profiles(input_locations, selected_months):
-
+def graph_profiles(input_locations, day_type):#, preload):   
+    
 #TODO first filter by answerID based on questions, then by profileid
     loc_list = pd.DataFrame(input_locations)
     years = loc_list.Year.unique()
+    
+# Get load profile data from disk
+    profiles = pd.DataFrame()
+    for y in years:
+        d = readAggProfiles(y)
+        profiles = profiles.append(d)        
+    
     locs = loc_list.LocName.unique()
     months=['January','February','March','April','May','June','July','August','September','October','November','December']
 
-    g = profiles[(profiles.ProfileID_i.isin(ids.loc[(ids.Year.isin(years))&(ids.LocName.isin(locs))&(ids.AnswerID!=0),'ProfileID']))]
-    gg = g.groupby(['daytype','month','hour'])['kw_mean'].mean().reset_index()
+#    g = profiles[(profiles.ProfileID_i.isin(ids.loc[(ids.Year.isin(years))&(ids.LocName.isin(locs))&(ids.AnswerID!=0),'ProfileID']))]
+    g = profiles[(profiles.ProfileID_i.isin(ids.loc[(ids.LocName.isin(locs))&(ids.AnswerID!=0),'ProfileID']))]
+    gg = g.groupby(['daytype','month','hour'])['kw_mean'].describe().reset_index()
 
-    for i in ['Weekday']:#gg.daytype.unique():
-        
-        dt_mean = gg[(gg.daytype==i)&gg.month.isin(selected_months)]
+    dt_mean = gg[(gg.daytype==day_type)]
 #        dt_profiles = g[(g.daytype==i)&g.month.isin(selected_months)]
+
+#        dt_mean['tix'] = 24*(dt_mean.month-selected_months[0]) + dt_mean.hour
+#        dt_mean['tixnames'] = dt_mean.apply(lambda x: 'mean demand'+'<br />'+months[int(x.month)-1]+' '+ str(int(x.hour))+'h00', axis=1)
     
-        dt_mean['tix'] = 24*(dt_mean.month-selected_months[0]) + dt_mean.hour
-        dt_mean['tixnames'] = dt_mean.apply(lambda x: 'mean demand'+'<br />'+months[int(x.month)-1]+' '+ str(int(x.hour))+'h00', axis=1)
-        
 #        dt_profiles['tix'] = 24*(dt_profiles.month-1) + dt_profiles.hour
 #        dt_profiles['tixnames'] = dt_profiles.apply(lambda x: 'mean demand'+'<br />Month '+str(int(x.month))+'<br />'+str(int(x.hour))+'h00', axis=1)
-        data = []
-        
-        for m in range(0, len(months)+1):
-        
-            trace = go.Scatter(
-                showlegend=True,
-                opacity=1,
-                x=dt_mean.loc[dt_mean['month']==m, 'hour'],#'tix'],
-                y=dt_mean.loc[dt_mean['month']==m, 'kw_mean'],
-                mode='lines',
-                name=months[m-1],
-                line=dict(
-                    #color='red',
-                    width=1.5),
-                hoverinfo = 'name+y'
-            )
-            data.append(trace)
-        
-        layout = go.Layout(showlegend=True, 
-            title= i + ' Average Daily Demand for Selected Locations',
-            margin = dict(t=150,r=150,b=50,l=150),
-            height = 400,
-            yaxis = dict(
-                    title = 'mean hourly demand (kW)',
-                    ticksuffix=' kW'),
-            xaxis = dict(                        
-                    title = 'time of day',
-                    ticktext = dt_mean['hour'].unique(),#[months[i-1] for i in selected_months],
-                    tickvals = dt_mean['hour'].unique(),#np.arange(12, (len(selected_months)*24), 24),
-#                    ticks = "",
-                    showgrid = False)
-                    )
-        fig = go.Figure(data=data, layout=layout)   
+    traces = []
+    
+    for m in range(0, 13):
+    
+        trace = go.Scatter(
+            showlegend=True,
+            opacity=1,
+            x=dt_mean.loc[dt_mean['month']==m, 'hour'],#'tix'],
+            y=dt_mean.loc[dt_mean['month']==m, 'mean'],
+            mode='lines',
+            name=months[m-1],
+            line=dict(
+                #color='red',
+                width=2.5),
+            hoverinfo = 'name+y+x'
+        )
+        traces.append(trace)
+    
+    layout = go.Layout(showlegend=True, 
+        title= day_type + ' Average Daily Demand for Selected Locations',
+        margin = dict(t=150,r=150,b=50,l=150),
+        height = 450,
+        yaxis = dict(
+                title = 'mean hourly demand (kW)',
+                ticksuffix=' kW'),
+        xaxis = dict(                        
+                title = 'time of day',
+                ticktext = dt_mean['hour'].unique(),#[months[i-1] for i in selected_months],
+                tickvals = dt_mean['hour'].unique(),#np.arange(12, (len(selected_months)*24), 24),
+                showgrid = True)
+                )
+    fig = go.Figure(data=traces, layout=layout)   
     
     return fig
 

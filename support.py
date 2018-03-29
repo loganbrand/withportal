@@ -80,11 +80,11 @@ def readAggProfiles(year):
                 df = feather.read_dataframe(str(child))
                 return df     
 
-def appProfiles():
+def appProfiles(yearstart, yearend):
     
     data = pd.DataFrame()
     
-    for y in range(1994, 2015):
+    for y in range(yearstart, yearend+1):
         d = readAggProfiles(y)
         data = data.append(d)
         
