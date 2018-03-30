@@ -36,7 +36,9 @@ mapbox_access_token = 'pk.eyJ1Ijoic2FpbnRseXZpIiwiYSI6ImNqZHZpNXkzcjFwejkyeHBkNn
 print('...loading socio demographic data...')
 # Load datasets
 ids = features.loadID()
-loc_summary = ids[ids.AnswerID!=0].groupby(['Year','LocName','Lat','Long','Municipality','Province'])['AnswerID'].count().reset_index()
+#interrogate data
+loc_summary = pd.pivot_table(ids, values = ['ProfileID','AnswerID'], index = ['Year','LocName','Lat','Long','Municipality','Province'],aggfunc = np.count_nonzero)
+loc_summary.reset_index(inplace=True)
 loc_summary.rename(columns={'AnswerID':'# households'}, inplace=True)
 
 print('Your app is starting now. Visit 127.0.0.1:8050 in your browser')
@@ -138,6 +140,64 @@ app.layout = html.Div([
         ),
         html.Hr(),
         html.Div([
+            html.H3('Specify Socio-demographic Indicators'),                  
+            html.Div([                
+                html.Div([
+                    html.P('Select household income range'),
+                    html.Div([
+                    dcc.RangeSlider(
+                        id = 'input-income',
+                        marks={i: 'R {}k'.format(i/1000) for i in range(0, 26000, 2500)},
+                        min=0,
+                        max=25000,
+                        included=True,
+                        value= [10000,15000],
+                        updatemode='drag'
+                    )     
+                    ],
+                    style={'margin-bottom':'20',
+                           'margin-right':'15',
+                           'margin-left':'15'}
+                )     
+                ],
+                    className='Ten columns',
+                    style={'margin-left':'0'}
+                ),
+                html.Div([
+                    html.P('Select household appliances'),
+                    dcc.Dropdown(
+                        id = 'input-appliances',
+                        options=[{'label': 'Fridge', 'value': 'Fridge'},
+                                 {'label': 'Geyser', 'value': 'Geyser'},
+                                 {'label': 'Heater', 'value': 'Heater'},
+                                 {'label': 'Hotplate', 'value': 'Hotplate'},
+                                 {'label': 'Iron', 'value': 'Iron'},
+                                 {'label': 'Kettle', 'value': 'Kettle'},
+                                 {'label': 'Microwave', 'value': 'Microwave'},
+                                 {'label': 'Stove', 'value': 'Stove'},
+                                 {'label': 'TV', 'value': 'TV'},
+                                 {'label': 'Washing machine', 'value': 'washing'},
+                        ],
+                        placeholder="Select appliances",
+                        multi=True
+                    )       
+                ],
+                    className='Eight columns',
+                    style={'margin-top':'15',
+                           'margin-left':'0'}
+                ),                
+            ],
+                className='columns',
+                style={'margin-bottom':'10',
+                       'margin-left':'0',
+                       'width':'50%',
+                       'float':'left'}
+            )
+        ],
+            className='row',
+        ),                              
+        html.Hr(),
+        html.Div([
             html.Div([
                 html.H3('View Load Profiles'),
                 dcc.RadioItems(
@@ -168,7 +228,7 @@ app.layout = html.Div([
         html.Hr(),
         html.Div([ 
             html.Div([
-                html.H3('Survey Questions'
+                html.H3('Discover Survey Questions'
                 ),
                 html.P('The DLR socio-demographic survey was updated in 2000. Select the surveys that you want to search.'),
                 html.Div([
@@ -195,13 +255,6 @@ app.layout = html.Div([
                     className='container',
                     style={'margin': '10'}
                 ),
-                dt.DataTable(
-                    id='output-search-word-questions',
-                    rows=[{}], # initialise the rows
-                    row_selectable=True,
-                    filterable=False,
-                    sortable=True,
-                    selected_row_indices=[],)
             ],
                 className='columns',
                 style={'margin':10,
@@ -209,30 +262,12 @@ app.layout = html.Div([
                        'float':'left'}
             ),
             html.Div([
-                html.H3('Survey Responses Overview'
-                ),
-                html.P('Select a question and set of locations to see the distribution of responses.'),
-                html.Div([
-                    dcc.RadioItems(
-                        id = 'input-summarise',
-                        options=[
-                                {'label': 'mean', 'value': 'mean'},
-                                {'label': 'count', 'value': 'count'}
-                                ],
-                        value='count',
-                        labelStyle={'display': 'inline-block'}
-                    )
-                ],
-                    className='container',
-                    style={'margin': '10'}
-                ),
                 dt.DataTable(
-                    id='output-locqu-summary',
+                    id='output-search-word-questions',
                     rows=[{}], # initialise the rows
                     row_selectable=True,
-                    filterable=True,
+                    filterable=False,
                     sortable=True,
-                    column_widths=40,
                     selected_row_indices=[],)
             ],
                 className='columns',
@@ -344,45 +379,6 @@ def update_map(input_locations):
     )
     return figure
    
-@app.callback(
-        Output('output-locqu-summary','rows'),
-        [#Input('output-location-list','selected_row_indices'),
-         Input('output-location-list','rows'),
-         Input('output-search-word-questions','selected_row_indices'),
-         Input('output-search-word-questions','rows'),
-         Input('input-summarise', 'value')
-         ]
-        )
-def update_locqu_summary(loc_rows, qu_selected_ix, qu_rows, summarise):
-
-    locations = pd.DataFrame(loc_rows)
-    years = locations.Year.unique()
-    idselect = ids.loc[(ids.Year.isin(years)) & (ids.LocName.isin(locations.LocName.unique())), ['id','Year','LocName']]
-    idselect.reset_index(inplace=True, drop=True)
-    
-    searchterms = list(pd.DataFrame(qu_rows).loc[qu_selected_ix, 'Question'])
-    
-    d = pd.DataFrame()
-    for y in years.astype(int):
-        df = features.buildFeatureFrame(searchterms, y)[0]
-        d = d.append(df)
-
-    locqu = idselect.merge(d, how='left',left_on='id',right_on='AnswerID')
-    locqu.drop('id', axis=1, inplace=True)
-    aggcols = locqu.columns[3::]
-    group_locqu = locqu.groupby(by=['Year','LocName'])[aggcols].describe()
- 
-    
-    if summarise == 'mean':
-        locqu_summary = group_locqu.iloc[:, (group_locqu.columns.get_level_values(1)=='mean')|(group_locqu.columns.get_level_values(1)=='50%')|(group_locqu.columns.get_level_values(1)=='std')]
-        locqu_summary.reset_index(inplace=True)
-            
-    elif summarise == 'count':
-        locqu_summary = group_locqu.iloc[:, (group_locqu.columns.get_level_values(1)=='count')]
-        locqu_summary.reset_index(inplace=True)
-        
-    return locqu_summary.to_dict('records')
-
 #@app.callback(
 #        Output('preload-profiles','children'),
 #        [Input('profiles-button','n_clicks'),

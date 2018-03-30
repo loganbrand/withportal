@@ -22,8 +22,8 @@ feather_table = os.path.join(table_dir, 'feather')
 os.makedirs(csv_table, exist_ok=True)
 os.makedirs(feather_table, exist_ok=True)
 
-csv_adtd = os.path.join('data', 'aggProfiles', 'csv')
-feather_adtd = os.path.join('data', 'aggProfiles', 'feather')
+csv_adtd = os.path.join('data', 'seasonProfiles', 'csv')
+feather_adtd = os.path.join('data', 'seasonProfiles', 'feather')
 os.makedirs(csv_adtd, exist_ok=True)
 os.makedirs(feather_adtd, exist_ok=True)
 
@@ -47,7 +47,7 @@ def appData():
         #write profiles to disk                
         feather.write_dataframe(table, os.path.join(feather_table, name + '.feather'))
     
-    profiles = ckan.action.package_show(id='dlr-average-day-type-demand-profiles')        
+    profiles = ckan.action.package_show(id='dlr-seasonal-adtd-profiles')        
     for i in range(0, len(profiles['resources'])):
         name = profiles['resources'][i]['name']
         print('... fetching ' + profiles['resources'][i]['name'] + ' from energydata.uct.ac.za')
@@ -59,14 +59,13 @@ def appData():
         adtd = pd.read_csv(os.path.join(csv_adtd, name + '.csv'))
         #write profiles to disk                
         feather.write_dataframe(adtd, os.path.join(feather_adtd, name + '.feather'))
-
     return
 
-def readAggProfiles(year):
+def readAggProfiles(year, directory = 'seasonProfiles'):
     """
     This function fetches aggregate load profile data from disk. aggfunc can be one of pp, aggpp_M, aMd, adtd
     """
-    path = os.path.join('data', 'aggProfiles', 'feather')
+    path = os.path.join('data', directory, 'feather')
     
     if len(os.listdir(path)) != 21:
         appData()
