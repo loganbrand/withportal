@@ -51,31 +51,6 @@ def loadTable(name, query=None, columns=None):
     except UnboundLocalError:
         return('Could not find table with name '+name)    
 
-def matchAIDToPID(year, pp):
-#TODO    still needs checking --- think about integrating with socios.loadID -> all PIDs and the 0 where there is no corresponding AID
-
-    a_id = loadID(year, id_name = 'AnswerID')['id']
-#    p_id = socios.loadID(year, id_name = 'ProfileID')['id']
-
-    #get dataframe of linkages between AnswerIDs and ProfileIDs
-    links = loadTable('links')
-#    year_links = links[links.ProfileID.isin(p_id)]
-    year_links = links[links.AnswerID.isin(a_id)]
-    year_links = year_links.loc[year_links.ProfileID != 0, ['AnswerID','ProfileID']]        
-    
-    #get profile metadata (recorder ID, recording channel, recorder type, units of measurement)
-    profiles = loadTable('profiles')
-    #add AnswerID information to profiles metadata
-    profile_meta = year_links.merge(profiles, left_on='ProfileID', right_on='ProfileId').drop('ProfileId', axis=1)        
-    VI_profile_meta = profile_meta.loc[(profile_meta['Unit of measurement'] == 2), :] #select current profiles only
-
-#THIS IS NB!!
-    output = pp.merge(VI_profile_meta.loc[:,['AnswerID','ProfileID']], left_on='ProfileID_i', right_on='ProfileID').drop(['ProfileID','Valid_i','Valid_v'], axis=1)
-    output = output[output.columns.sort_values()]
-    output.fillna({'valid_calculated':0}, inplace=True)
-    
-    return output
-
 def loadID():
     """
     This function subsets Answer or Profile IDs by year. Tables variable can be constructred with loadTables() function. Year input can be number or string. id_name is AnswerID or ProfileID. 
@@ -86,10 +61,9 @@ def loadID():
     
 #    a_id = links[(links.GroupID != 0) & (links['AnswerID'] != 0)].drop(columns=['ConsumerID','lock','ProfileID'])
     p_id = links[(links.GroupID != 0) & (links['ProfileID'] != 0)].drop(columns=['ConsumerID','lock','AnswerID'])
-    ap = links[links.GroupID==0].drop(columns=['ConsumerID','lock','GroupID'])
-    
     profile_meta = profiles.merge(p_id, how='left', left_on='ProfileId', right_on='ProfileID').drop(columns=['ProfileId','lock'])
 
+    ap = links[links.GroupID==0].drop(columns=['ConsumerID','lock','GroupID'])
     x = profile_meta.merge(ap, how='outer', on = 'ProfileID')    
     join = x.merge(groups, on='GroupID', how='left')
 
@@ -104,107 +78,88 @@ def loadID():
         
     return all_ids
 
-def loadQuestions(dtype = None):
-    """
-    This function gets all questions.
-    
-    """
-    qu = loadTable('questions').drop(labels='lock', axis=1)
-    qu.Datatype = qu.Datatype.astype('category')
-    qu.Datatype.cat.categories = ['blob','char','num']
-    if dtype is None:
-        pass
-    else: 
-        qu = qu[qu.Datatype == dtype]
-    return qu
-
-def loadAnswers(dtype = None):
+def loadAnswers():
     """
     This function returns all answer IDs and their question responses for a selected data type. If dtype is None, answer IDs and their corresponding questionaire IDs are returned instead.
     
     """
-    if dtype is None:
-        ans = loadTable('answers', columns=['AnswerID', 'QuestionaireID'])
-    elif dtype == 'blob':
-        ans = loadTable('answers_blob_anonymised')
-        ans.fillna(np.nan, inplace = True)
-    elif dtype == 'char':
-        ans = loadTable('answers_char_anonymised').drop(labels='lock', axis=1)
-    elif dtype == 'num':
-        ans = loadTable('answers_number_anonymised').drop(labels='lock', axis=1)
-    return ans
+    answer_meta = loadTable('answers', columns=['AnswerID', 'QuestionaireID'])
 
-def searchQuestions(searchterm = '', qnairid = None, dtype = None):
+    blob = loadTable('answers_blob_anonymised').drop(labels='lock', axis=1)
+    blob = blob.merge(answer_meta, how='left', on='AnswerID')
+    blob.fillna(np.nan, inplace = True)
+    
+    char = loadTable('answers_char_anonymised').drop(labels='lock', axis=1)
+    char = char.merge(answer_meta, how='left', on='AnswerID')
+    char.fillna(np.nan, inplace = True)
+
+    num = loadTable('answers_number_anonymised').drop(labels='lock', axis=1)
+    num = num.merge(answer_meta, how='left', on='AnswerID')
+    num.fillna(np.nan, inplace = True)
+
+    return {'blob':blob, 'char':char, 'num':num}
+
+def searchQuestions(search = None):
     """
     Searches questions for a search term, taking questionaire ID and question data type (num, blob, char) as input. 
     A single search term can be specified as a string, or a list of search terms as list.
     
-    """
-    if isinstance(searchterm, list):
-        pass
+    """       
+    questions = loadTable('questions').drop(labels='lock', axis=1)
+    questions.Datatype = questions.Datatype.astype('category')
+    questions.Datatype.cat.categories = ['blob','char','num']
+        
+    if search is None:
+        searchterm = ''
     else:
-        searchterm = [searchterm]
-    searchterm = [s.lower() for s in searchterm]
-    qcons = loadTable('qconstraints').drop(labels='lock', axis=1)
-    qu = loadQuestions(dtype)
-    qdf = qu.join(qcons, 'QuestionID', rsuffix='_c') #join question constraints to questions table
-    qnairids = list(loadTable('questionaires')['QuestionaireID']) #get list of valid questionaire IDs
-    if qnairid is None: #gets all relevant queries
-        pass
-    elif qnairid in qnairids: #check that ID is valid if provided
-        qdf = qdf[qdf.QuestionaireID == qnairid] #subset dataframe to relevant ID
-    else:
-        return print('Please select a valid QuestionaireID', qnairids)
-    
-    result = qdf.loc[qdf.Question.str.lower().str.contains('|'.join(searchterm)), ['Question', 'Datatype','QuestionaireID', 'ColumnNo', 'Lower', 'Upper']]
+        searchterm = search.lower().replace(' ', '+')
+
+    result = questions.loc[questions.Question.str.lower().str.contains(searchterm), ['Question', 'Datatype','QuestionaireID', 'ColumnNo']]
     return result
 
-def searchAnswers(searchterm = '', qnairid = 3, dtype = 'num'):
+def searchAnswers(search):
     """
     This function returns the answers IDs and responses for a list of search terms
     
     """
-    allans = loadAnswers() #get answer IDs for questionaire IDs
-    ans = loadAnswers(dtype) #retrieve all responses for data type
-    questions = searchQuestions(searchterm, qnairid, dtype) #get column numbers for query
-    result = ans[ans.AnswerID.isin(allans[allans.QuestionaireID == qnairid]['AnswerID'])] #subset responses by answer IDs
-    result = result.iloc[:, [0] +  list(questions['ColumnNo'])]
-    
-    return [result, questions[['ColumnNo','Question']]]
+    answers = loadAnswers()
 
-def buildFeatureFrame(searchlist, year):
+    questions = searchQuestions(search) #get column numbers for query
+    
+    result = pd.DataFrame(columns=['AnswerID','QuestionaireID'])
+    for dt in questions.Datatype.unique():
+        ans = answers[dt]
+        for i in questions.QuestionaireID.unique():            
+            select = questions.loc[(questions.Datatype == dt)&(questions.QuestionaireID==i)]            
+            fetchcolumns=['AnswerID'] + ['QuestionaireID'] + list(select.ColumnNo.astype(str))
+            newcolumns = ['AnswerID'] + ['QuestionaireID'] + list(select.Question.astype(str).str.lower())
+            
+            df = ans.loc[ans['QuestionaireID']==i,fetchcolumns]           
+            df.columns = newcolumns
+            
+            result = result.merge(df, how='outer')
+            
+    return result
+
+def buildFeatureFrame(searchlist):
     """
     This function creates a dataframe containing the data for a set of selected features for a given year.
     
     """
-    year = int(year)
-    ids = loadID()
-    data = ids.loc[ids.Year == year, ['AnswerID', 'ProfileID', 'Year', 'LocName', 'Province','Municipality', 'District', 'Unit of measurement']] #get AnswerIDs for year
-    data = data[data.AnswerID!=0]
-
-    questions = pd.DataFrame() #construct dataframe with feature questions
-
     if isinstance(searchlist, list):
         pass
     else:
         searchlist = [searchlist]
-        
+    
+    result = pd.DataFrame(columns=['AnswerID','QuestionaireID'])        
     for s in searchlist:
-        try:
-            if year <= 1999:
-                d, q = searchAnswers(s, qnairid = 6, dtype = 'num')
-            else:
-                d, q = searchAnswers(s, qnairid = 3, dtype = 'num')
-                d.columns = ['AnswerID', s]
-            q['searchterm'] = s
-            newdata = d[d.AnswerID.isin(data.AnswerID)]
-            data = pd.merge(data, newdata, on = 'AnswerID')
-            questions = pd.concat([questions, q])
-        except:
-            pass
-    questions.reset_index(drop=True, inplace=True)
+        d = searchAnswers(s)
+        ans = d[d.QuestionaireID.isin([3,6])]
+        ans = ans.dropna(axis=1, how='all')
         
-    return data, questions
+        result = result.merge(ans, how='outer')
+        
+    return result
 
 def checkAnswer(answerid, features):
     """

@@ -22,7 +22,7 @@ import os
 import base64
 
 import features
-from support import readAggProfiles #appProfiles, 
+from support import appProfiles 
 
 # Load images
 erc_logo = os.path.join('img', 'erc_logo.jpg')
@@ -33,13 +33,17 @@ sanedi_encoded = base64.b64encode(open(sanedi_logo, 'rb').read())
 # Get mapbox token
 mapbox_access_token = 'pk.eyJ1Ijoic2FpbnRseXZpIiwiYSI6ImNqZHZpNXkzcjFwejkyeHBkNnp3NTkzYnQifQ.Rj_C-fOaZXZTVhTlliofMA'
 
-print('...loading socio demographic data...')
 # Load datasets
+print('...loading socio demographic data...')
 ids = features.loadID()
 #interrogate data
-loc_summary = pd.pivot_table(ids, values = ['ProfileID','AnswerID'], index = ['Year','LocName','Lat','Long','Municipality','Province'],aggfunc = np.count_nonzero)
+loc_summary = pd.pivot_table(ids, values = ['AnswerID'], index = ['Year','LocName','Lat','Long','Municipality','Province'],aggfunc = np.count_nonzero)
 loc_summary.reset_index(inplace=True)
 loc_summary.rename(columns={'AnswerID':'# households'}, inplace=True)
+                            
+# Get load profile data from disk
+print('...loading load profile data...')
+profiles = appProfiles(1994,2014)  
 
 print('Your app is starting now. Visit 127.0.0.1:8050 in your browser')
 
@@ -125,7 +129,7 @@ app.layout = html.Div([
                     min_height = 450,
                     resizable=True,
                     selected_row_indices=[],),
-                html.P('"# households" is the number of households surveyed at that location',
+                html.P('"# households" is the number of households for which socio-demographic survey data is available',
                        style={'font-style': 'italic'}
                        )     
             ],
@@ -141,7 +145,28 @@ app.layout = html.Div([
         html.Hr(),
         html.Div([
             html.H3('Specify Socio-demographic Indicators'),                  
-            html.Div([                
+            html.Div([
+                html.Div([
+                    html.P('Select number of years electrified'),
+                    html.Div([
+                    dcc.RangeSlider(
+                        id = 'input-electrified',
+                        marks= list(range(0, 16, 1)),#{i: ''.format(i) for i in range(0, 15, 1)},
+                        min=0,
+                        max=15,
+                        included=True,
+                        value= [0,15],
+                        updatemode='drag'
+                    )     
+                    ],
+                    style={'margin-bottom':'30',
+                           'margin-right':'15',
+                           'margin-left':'15'}
+                )     
+                ],
+                    className='Ten columns',
+                    style={'margin-left':'0'}
+                ),
                 html.Div([
                     html.P('Select household income range'),
                     html.Div([
@@ -151,7 +176,7 @@ app.layout = html.Div([
                         min=0,
                         max=25000,
                         included=True,
-                        value= [10000,15000],
+                        value= [0,25000],
                         updatemode='drag'
                     )     
                     ],
@@ -163,6 +188,14 @@ app.layout = html.Div([
                     className='Ten columns',
                     style={'margin-left':'0'}
                 ),
+            ],
+                className='columns',
+                style={'margin-bottom':'10',
+                       'margin-left':'0',
+                       'width':'50%',
+                       'float':'left'}
+            ),            
+            html.Div([            
                 html.Div([
                     html.P('Select household appliances'),
                     dcc.Dropdown(
@@ -183,15 +216,14 @@ app.layout = html.Div([
                     )       
                 ],
                     className='Eight columns',
-                    style={'margin-top':'15',
-                           'margin-left':'0'}
+                    style={'margin-left':'0'}
                 ),                
             ],
                 className='columns',
                 style={'margin-bottom':'10',
                        'margin-left':'0',
-                       'width':'50%',
-                       'float':'left'}
+                       'width':'45%',
+                       'float':'right'}
             )
         ],
             className='row',
@@ -379,27 +411,6 @@ def update_map(input_locations):
     )
     return figure
    
-#@app.callback(
-#        Output('preload-profiles','children'),
-#        [Input('profiles-button','n_clicks'),
-#         Input('output-location-list','rows')
-#        ]
-#        )
-#def preload_profiles(nclicks, input_locations):
-#
-#    loc_list = pd.DataFrame(input_locations)
-#    years = loc_list.Year.unique()
-#    
-## Get load profile data from disk
-#    print('...loading load profile data...')
-#    profiles = pd.DataFrame()
-#    for y in years:
-#        d = readAggProfiles(y)
-#        profiles = profiles.append(d)    
-##    profiles = appProfiles(yearstart, yearend) 
-#
-#    return profiles.to_feather() 
-
 @app.callback(
         Output('graph-profiles','figure'),
         [Input('output-location-list','rows'),
@@ -412,40 +423,23 @@ def graph_profiles(input_locations, day_type):#, preload):
     
 #TODO first filter by answerID based on questions, then by profileid
     loc_list = pd.DataFrame(input_locations)
-    years = loc_list.Year.unique()
-    
-# Get load profile data from disk
-    profiles = pd.DataFrame()
-    for y in years:
-        d = readAggProfiles(y)
-        profiles = profiles.append(d)        
-    
     locs = loc_list.LocName.unique()
-    months=['January','February','March','April','May','June','July','August','September','October','November','December']
 
-#    g = profiles[(profiles.ProfileID_i.isin(ids.loc[(ids.Year.isin(years))&(ids.LocName.isin(locs))&(ids.AnswerID!=0),'ProfileID']))]
-    g = profiles[(profiles.ProfileID_i.isin(ids.loc[(ids.LocName.isin(locs))&(ids.AnswerID!=0),'ProfileID']))]
-    gg = g.groupby(['daytype','month','hour'])['kw_mean'].describe().reset_index()
-
+    g = profiles[(profiles.ProfileID_i.isin(ids.loc[(ids.LocName.isin(locs)),'ProfileID']))]
+    gg = g.groupby(['daytype','season','hour'])['kw_mean'].describe().reset_index()
     dt_mean = gg[(gg.daytype==day_type)]
-#        dt_profiles = g[(g.daytype==i)&g.month.isin(selected_months)]
 
-#        dt_mean['tix'] = 24*(dt_mean.month-selected_months[0]) + dt_mean.hour
-#        dt_mean['tixnames'] = dt_mean.apply(lambda x: 'mean demand'+'<br />'+months[int(x.month)-1]+' '+ str(int(x.hour))+'h00', axis=1)
-    
-#        dt_profiles['tix'] = 24*(dt_profiles.month-1) + dt_profiles.hour
-#        dt_profiles['tixnames'] = dt_profiles.apply(lambda x: 'mean demand'+'<br />Month '+str(int(x.month))+'<br />'+str(int(x.hour))+'h00', axis=1)
     traces = []
     
-    for m in range(0, 13):
+    for s in ['high','low']:
     
         trace = go.Scatter(
             showlegend=True,
             opacity=1,
-            x=dt_mean.loc[dt_mean['month']==m, 'hour'],#'tix'],
-            y=dt_mean.loc[dt_mean['month']==m, 'mean'],
+            x=dt_mean.loc[dt_mean['season']==s, 'hour'],
+            y=dt_mean.loc[dt_mean['season']==s, 'mean'],
             mode='lines',
-            name=months[m-1],
+            name=s+ ' season',
             line=dict(
                 #color='red',
                 width=2.5),
@@ -462,8 +456,8 @@ def graph_profiles(input_locations, day_type):#, preload):
                 ticksuffix=' kW'),
         xaxis = dict(                        
                 title = 'time of day',
-                ticktext = dt_mean['hour'].unique(),#[months[i-1] for i in selected_months],
-                tickvals = dt_mean['hour'].unique(),#np.arange(12, (len(selected_months)*24), 24),
+                ticktext = dt_mean['hour'].unique(),
+                tickvals = dt_mean['hour'].unique(),
                 showgrid = True)
                 )
     fig = go.Figure(data=traces, layout=layout)   
