@@ -36,10 +36,12 @@ mapbox_access_token = 'pk.eyJ1Ijoic2FpbnRseXZpIiwiYSI6ImNqZHZpNXkzcjFwejkyeHBkNn
 # Load datasets
 print('...loading socio demographic data...')
 ids = features.loadID()
-#interrogate data
+#a little bit of data wrangling
 loc_summary = pd.pivot_table(ids, values = ['AnswerID'], index = ['Year','LocName','Lat','Long','Municipality','Province'],aggfunc = np.count_nonzero)
 loc_summary.reset_index(inplace=True)
 loc_summary.rename(columns={'AnswerID':'# households'}, inplace=True)
+#load socio-demographic feature frame
+sd = features.socio_demographics()
                             
 # Get load profile data from disk
 print('...loading load profile data...')
@@ -200,16 +202,17 @@ app.layout = html.Div([
                     html.P('Select household appliances'),
                     dcc.Dropdown(
                         id = 'input-appliances',
-                        options=[{'label': 'Fridge', 'value': 'Fridge'},
-                                 {'label': 'Geyser', 'value': 'Geyser'},
-                                 {'label': 'Heater', 'value': 'Heater'},
-                                 {'label': 'Hotplate', 'value': 'Hotplate'},
-                                 {'label': 'Iron', 'value': 'Iron'},
-                                 {'label': 'Kettle', 'value': 'Kettle'},
-                                 {'label': 'Microwave', 'value': 'Microwave'},
-                                 {'label': 'Stove', 'value': 'Stove'},
-                                 {'label': 'TV', 'value': 'TV'},
-                                 {'label': 'Washing machine', 'value': 'washing'},
+                        options=[{'label': 'Fridge-Freezer', 'value': 'fridge_freezer'},
+                                 {'label': 'Geyser', 'value': 'geyser'},
+                                 {'label': 'Heater', 'value': 'heater'},
+                                 {'label': 'Hotplate', 'value': 'hotplate'},
+                                 {'label': 'Iron', 'value': 'iron'},
+                                 {'label': 'Kettle', 'value': 'kettle'},
+                                 {'label': 'Microwave', 'value': 'microwave'},
+                                 {'label': '3-plate Stove', 'value': '3_plate'},
+                                 {'label': '4-plate Stove', 'value': '4_plate'},
+                                 {'label': 'TV', 'value': 'tv'},
+                                 {'label': 'Washing machine', 'value': 'washing_machine'},
                         ],
                         placeholder="Select appliances",
                         multi=True
@@ -410,6 +413,19 @@ def update_map(input_locations):
             )
     )
     return figure
+
+@app.callback(
+        Output('features','children'),
+        [Input('input-electrified', 'value'),
+         Input('input-income', 'value'),
+         Input('input-appliances', 'value')
+        ]
+        )
+def socio_demographics(electrified, income, appliances):
+    
+    sd
+    
+    return sd
    
 @app.callback(
         Output('graph-profiles','figure'),

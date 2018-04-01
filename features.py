@@ -112,9 +112,11 @@ def searchQuestions(search = None):
     if search is None:
         searchterm = ''
     else:
-        searchterm = search.lower().replace(' ', '+')
+        searchterm = search.replace(' ', '+')
 
-    result = questions.loc[questions.Question.str.lower().str.contains(searchterm), ['Question', 'Datatype','QuestionaireID', 'ColumnNo']]
+    trantab = str.maketrans({'(':'', ')':'', ' ':'', '/':''})
+    
+    result = questions.loc[questions.Question.str.translate(trantab).str.contains(searchterm, case=False), ['Question', 'Datatype','QuestionaireID', 'ColumnNo']]
     return result
 
 def searchAnswers(search):
@@ -141,7 +143,7 @@ def searchAnswers(search):
             
     return result
 
-def buildFeatureFrame(searchlist):
+def buildFeatureFrame(searchlist, questionaires, cols=None):
     """
     This function creates a dataframe containing the data for a set of selected features for a given year.
     
@@ -150,16 +152,43 @@ def buildFeatureFrame(searchlist):
         pass
     else:
         searchlist = [searchlist]
+        
+    if isinstance(questionaires, list):
+        pass
+    else:
+        questionaires = [questionaires]
     
+    #generate feature frame
     result = pd.DataFrame(columns=['AnswerID','QuestionaireID'])        
     for s in searchlist:
         d = searchAnswers(s)
-        ans = d[d.QuestionaireID.isin([3,6])]
+        ans = d[d.QuestionaireID.isin(questionaires)]
         ans = ans.dropna(axis=1, how='all')
         
         result = result.merge(ans, how='outer')
+    
+    #set feature frame column names
+    if cols != None:
+        if isinstance(cols, list):
+            pass
+        else:
+            cols = [cols]
+        result.columns = ['AnswerID','QuestionaireID'] + cols
         
     return result
+
+def socio_demographics():
+    
+    appliances = ['fridge freezer','geyser','heater','hotplate','iron','kettle','microwave','3 plate', '4 plate','tv','washing machine']    
+    features6 = ['years','monthly income'] + appliances
+    features3 = ['electricity','deductions'] + ['{}Number'.format(i) for i in appliances]     
+    cols = ['years_electrified','monthly_income'] + [i.replace(' ','_') for i in appliances]
+    
+    f6 = buildFeatureFrame(features6, 6, cols) #generate feature frame for years pre 1999
+    f3 = buildFeatureFrame(features3, 3, cols) #generate feature frame for years post 1999    
+    ff = f3.append(f6)
+    
+    return ff
 
 def checkAnswer(answerid, features):
     """
