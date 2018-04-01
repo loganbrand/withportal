@@ -417,12 +417,19 @@ def update_map(input_locations):
 @app.callback(
         Output('features','children'),
         [Input('input-electrified', 'value'),
+         Input('input-electrified', 'max'),
          Input('input-income', 'value'),
+         Input('input-income', 'max'),
          Input('input-appliances', 'value')
         ]
         )
-def socio_demographics(electrified, income, appliances):
-    
+def socio_demographics(electrified, electrified_max, income, income_max, appliances):
+
+    if electrified[1] == electrified_max:
+        electrified[1] = sd.years_electrified.max()
+    if income[1] == income_max:
+        income[1] = sd.monthly_income.max()
+        
     sd
     
     return sd
