@@ -59,6 +59,9 @@ for css in external_css:
     app.css.append_css({"external_url": css})
 
 app.layout = html.Div([
+
+###############################
+
         html.Div([
             html.Div([
                 html.Img(src='data:image/png;base64,{}'.format(erc_encoded.decode()), 
@@ -88,16 +91,24 @@ app.layout = html.Div([
             style={'background':'white',
                    'margin-bottom':'40'}
         ), 
+    
+################~Survey Locations~###############
+    
         html.Div([
-            html.H3('Survey Locations'
-            ),
             html.Div([
+                html.H3('Survey Locations'
+                ),
                 html.Div([
                     dcc.Graph(
                         animate=True,
                         style={'height': 450},
                         id='map'
                     ),
+                ],
+                    className='columns',
+                    style={'margin-left':'0'}
+                ),
+                html.Div([
                     dcc.RangeSlider(
                         id = 'input-years',
                         marks={i: i for i in range(1994, 2015, 2)},
@@ -105,12 +116,14 @@ app.layout = html.Div([
                         max=2014,
                         step=1,
                         included=True,
-                        value= [2012, 2014],
+                        value= [1994, 2014],
                         updatemode='drag',
                         dots = True
                     )       
                 ],
-                    className='Eleven columns'
+                    className='eleven columns',
+                    style={'margin-left':'25',
+                           'margin-right':'15'}
                 ),
             ],
                 className='columns',
@@ -119,7 +132,178 @@ app.layout = html.Div([
                        'width':'50%',
                        'float':'left'}
             ),
+
+########~~~~~~~~Specify Socio-demographic Indicators~~~~~~~~~########
+
             html.Div([
+                html.H5('Specify Socio-demographic Indicators'
+                ),                  
+
+#~~~~---Select number of years electrified---~~~~
+
+                html.Div([
+                    html.P('Select number of years electrified'),
+                    html.Div([
+                        dcc.RangeSlider(
+                            id = 'input-electrified',
+                            marks= list(range(0, 16, 1)),#{i: ''.format(i) for i in range(0, 15, 1)},
+                            min=0,
+                            max=15,
+                            included=True,
+                            value= [0,15],
+                            updatemode='drag'
+                        )     
+                    ],
+                        style={'margin-bottom':'50',
+                               'margin-left':'20'}
+                    )     
+                ],
+                    className='columns',
+                    style={'margin-top':'25',
+                           'margin-left':'0'}
+                ),
+
+#~~~~---Select household income range---~~~~
+
+                html.Div([
+                    html.P('Select household income range'),
+                    html.Div([
+                        dcc.RangeSlider(
+                            id = 'input-income',
+                            marks={i: 'R {}k'.format(i/1000) for i in range(0, 26000, 2500)},
+                            min=0,
+                            max=25000,
+                            included=True,
+                            value= [0,25000],
+                            updatemode='drag'
+                        )     
+                    ],
+                        style={'margin-bottom':'50',
+                               'margin-left':'20'}
+                    )     
+                ],
+                    className='columns',
+                    style={'margin-left':'0'}
+                ),
+
+#~~~~---Select household appliances---~~~~
+
+                html.Div([
+                    html.P('Select household appliances'),
+                    html.Div([
+                        dcc.Dropdown(
+                            id = 'input-appliances',
+                            options=[{'label': 'Fridge-Freezer', 'value': 'fridge_freezer'},
+                                     {'label': 'Geyser', 'value': 'geyser'},
+                                     {'label': 'Heater', 'value': 'heater'},
+                                     {'label': 'Hotplate', 'value': 'hotplate'},
+                                     {'label': 'Iron', 'value': 'iron'},
+                                     {'label': 'Kettle', 'value': 'kettle'},
+                                     {'label': 'Microwave', 'value': 'microwave'},
+                                     {'label': '3-plate Stove', 'value': '3_plate'},
+                                     {'label': '4-plate Stove', 'value': '4_plate'},
+                                     {'label': 'TV', 'value': 'tv'},
+                                     {'label': 'Washing machine', 'value': 'washing_machine'},
+                            ],
+                            placeholder="Select appliances",
+                            multi=True
+                        )
+                    ],
+                    style={'margin-bottom':'50',
+                           'margin-left':'20'}
+                    ),
+                ],
+                    className='columns',
+                    style={'margin-left':'0'}
+                ),                
+########~~~~~~~~section end~~~~~~~~########
+            ],
+                className='columns',
+                style={'margin-top':'75',
+                       'margin-bottom':'10',
+                       'margin-right':'15',
+                       'margin-left':'25',
+                       'width':'45%',
+                       'float':'right'}
+            ),    
+################~section end~################
+        ],
+            className='row',
+        ),
+        html.Hr(),
+
+################~View Load Profiles~###############
+
+        html.Div([
+            html.H3('View Load Profiles'),
+            dcc.RadioItems(
+                id = 'input-daytype',
+                options=[
+                        {'label': 'Weekday', 'value': 'Weekday'},
+                        {'label': 'Saturday', 'value': 'Saturday'},
+                        {'label': 'Sunday', 'value': 'Sunday'}
+                        ],
+                value='Weekday'
+            ),
+            dcc.Graph(
+                id='graph-profiles'
+            ),
+#                dcc.RangeSlider(
+#                    id = 'input-months',
+#                    marks=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+#                    min=0,
+#                    max=11,
+#                    step=1,
+#                    included=True,
+#                    value= [5,7],
+#                    updatemode='drag',
+#                    dots = True
+#                )       
+        ]),                        
+        html.Hr(),
+
+################~Explore Profile Meta-data~###############
+
+        html.Div([
+            html.H3('Explore Profile Meta-data'),
+
+########~~~~~~~~Discover Survey Questions~~~~~~~~########
+
+            html.Div([
+                html.H5('Discover Survey Questions'
+                ),
+                html.Div([
+                    dcc.Input(
+                        id='input-search-word',
+                        placeholder='search term',
+                        type='text',
+                        value=''
+                    )
+                ],
+                    className='container',
+                    style={'margin': '10'}
+                ),
+                dt.DataTable(
+                    id='output-search-word-questions',
+                    rows=[{}], # initialise the rows
+                    row_selectable=True,
+                    columns = ['Question','Survey','Datatype'],
+                    filterable=False,
+                    sortable=True,
+                    selected_row_indices=[]
+                )
+            ],
+                className='columns',
+                style={'margin-bottom':'10',
+                       'margin-left':'0',
+                       'width':'50%',
+                       'float':'left'}
+            ),
+
+########~~~~~~~~Location Output Summary~~~~~~~~########
+
+            html.Div([
+                html.H5('Location Output Summary'),
                 dt.DataTable(
                     id='output-location-list',
                     rows=[{}], # initialise the rows
@@ -137,183 +321,17 @@ app.layout = html.Div([
             ],
                 className='columns',
                 style={'margin-bottom':'10',
-                       'margin-top':'30',
                        'width':'45%',
                        'float':'right'}
             ),
-        ],
-            className='row',
-        ),
-        html.Hr(),
-        html.Div([
-            html.H3('Specify Socio-demographic Indicators'),                  
-            html.Div([
-                html.Div([
-                    html.P('Select number of years electrified'),
-                    html.Div([
-                    dcc.RangeSlider(
-                        id = 'input-electrified',
-                        marks= list(range(0, 16, 1)),#{i: ''.format(i) for i in range(0, 15, 1)},
-                        min=0,
-                        max=15,
-                        included=True,
-                        value= [0,15],
-                        updatemode='drag'
-                    )     
-                    ],
-                    style={'margin-bottom':'30',
-                           'margin-right':'15',
-                           'margin-left':'15'}
-                )     
-                ],
-                    className='Ten columns',
-                    style={'margin-left':'0'}
-                ),
-                html.Div([
-                    html.P('Select household income range'),
-                    html.Div([
-                    dcc.RangeSlider(
-                        id = 'input-income',
-                        marks={i: 'R {}k'.format(i/1000) for i in range(0, 26000, 2500)},
-                        min=0,
-                        max=25000,
-                        included=True,
-                        value= [0,25000],
-                        updatemode='drag'
-                    )     
-                    ],
-                    style={'margin-bottom':'20',
-                           'margin-right':'15',
-                           'margin-left':'15'}
-                )     
-                ],
-                    className='Ten columns',
-                    style={'margin-left':'0'}
-                ),
-            ],
-                className='columns',
-                style={'margin-bottom':'10',
-                       'margin-left':'0',
-                       'width':'50%',
-                       'float':'left'}
-            ),            
-            html.Div([            
-                html.Div([
-                    html.P('Select household appliances'),
-                    dcc.Dropdown(
-                        id = 'input-appliances',
-                        options=[{'label': 'Fridge-Freezer', 'value': 'fridge_freezer'},
-                                 {'label': 'Geyser', 'value': 'geyser'},
-                                 {'label': 'Heater', 'value': 'heater'},
-                                 {'label': 'Hotplate', 'value': 'hotplate'},
-                                 {'label': 'Iron', 'value': 'iron'},
-                                 {'label': 'Kettle', 'value': 'kettle'},
-                                 {'label': 'Microwave', 'value': 'microwave'},
-                                 {'label': '3-plate Stove', 'value': '3_plate'},
-                                 {'label': '4-plate Stove', 'value': '4_plate'},
-                                 {'label': 'TV', 'value': 'tv'},
-                                 {'label': 'Washing machine', 'value': 'washing_machine'},
-                        ],
-                        placeholder="Select appliances",
-                        multi=True
-                    )       
-                ],
-                    className='Eight columns',
-                    style={'margin-left':'0'}
-                ),                
-            ],
-                className='columns',
-                style={'margin-bottom':'10',
-                       'margin-left':'0',
-                       'width':'45%',
-                       'float':'right'}
-            )
-        ],
-            className='row',
-        ),                              
-        html.Hr(),
-        html.Div([
-            html.Div([
-                html.H3('View Load Profiles'),
-                dcc.RadioItems(
-                    id = 'input-daytype',
-                    options=[
-                            {'label': 'Weekday', 'value': 'Weekday'},
-                            {'label': 'Saturday', 'value': 'Saturday'},
-                            {'label': 'Sunday', 'value': 'Sunday'}
-                            ],
-                    value='Weekday'
-                ),
-                dcc.Graph(
-                    id='graph-profiles'
-                ),
-#                dcc.RangeSlider(
-#                    id = 'input-months',
-#                    marks=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
-#                    min=0,
-#                    max=11,
-#                    step=1,
-#                    included=True,
-#                    value= [5,7],
-#                    updatemode='drag',
-#                    dots = True
-#                )       
-            ])
-        ]),                        
-        html.Hr(),
-        html.Div([ 
-            html.Div([
-                html.H3('Discover Survey Questions'
-                ),
-                html.P('The DLR socio-demographic survey was updated in 2000. Select the surveys that you want to search.'),
-                html.Div([
-                    dcc.Checklist(
-                        id = 'input-survey',
-                        options=[
-                                {'label': '1994 - 1999', 'value': 6},
-                                {'label': '2000 - 2014', 'value': 3}
-                                ],
-                        values=[3]
-                    )
-                ],
-                    className='container',
-                    style={'margin': '10'}
-                ),
-                html.Div([
-                    dcc.Input(
-                        id='input-search-word',
-                        placeholder='search term',
-                        type='text',
-                        value=''
-                    )
-                ],
-                    className='container',
-                    style={'margin': '10'}
-                ),
-            ],
-                className='columns',
-                style={'margin':10,
-                       'width':'40%',
-                       'float':'left'}
-            ),
-            html.Div([
-                dt.DataTable(
-                    id='output-search-word-questions',
-                    rows=[{}], # initialise the rows
-                    row_selectable=True,
-                    filterable=False,
-                    sortable=True,
-                    selected_row_indices=[],)
-            ],
-                className='columns',
-                style={'margin':10,
-                       'width':'50%',
-                       'float':'right'}
-            )
+########~~~~~~~~section end~~~~~~~~########
         ],
             className='row'
         ),
     ],
+
+###############################
+
     #Set the style for the overall dashboard
     style={
         'width': '100%',
@@ -343,18 +361,16 @@ def update_locations(input_years):
             
 @app.callback(
         Output('output-search-word-questions','rows'),
-        [Input('input-search-word','value'),
-         Input('input-survey','values')]
+        [Input('input-search-word','value')
+        ]
         )
-def update_questions(search_word, surveys):
-    if isinstance(surveys, list):
-        pass
-    else:
-        surveys = [surveys]
-    df = features.searchQuestions(search_word)[['Question','QuestionaireID']]
-    dff = df.loc[df['QuestionaireID'].isin(surveys)]
-    questions = pd.DataFrame(dff['Question'])
-    return questions.to_dict('records')
+def update_questions(search_word):
+    df = features.searchQuestions(search_word)[['Question','QuestionaireID','Datatype']]
+    dff = df.loc[df['QuestionaireID'].isin([3,6])]
+    dff.loc[:,'Survey'] = dff.QuestionaireID.map({3:'2000-2014',6:'1994-1999'})
+    dff.drop(columns='QuestionaireID', inplace=True)
+#    questions = pd.DataFrame(dff['Question'])
+    return dff.to_dict('records')
 
 @app.callback(
         Output('map','figure'),        
@@ -396,11 +412,11 @@ def update_map(input_locations):
                     accesstoken=mapbox_access_token,
                     bearing=0,
                     center=dict(
-                        lat=loc_summary[loc_summary.LocName=='Ikgomotseng'] ['Lat'].unique()[0],
-                        lon=loc_summary[loc_summary.LocName=='Ikgomotseng']['Long'].unique()[0]
+                        lat=-29.1,#loc_summary[loc_summary.LocName=='Ikgomotseng'] ['Lat'].unique()[0],
+                        lon=25#loc_summary[loc_summary.LocName=='Ikgomotseng']['Long'].unique()[0]
                     ),
                     pitch=0,
-                    zoom=4.2,
+                    zoom=4.32,
                     style='light'
                 ),
                 margin = go.Margin(
