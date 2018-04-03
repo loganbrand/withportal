@@ -3,11 +3,11 @@
 ## Installation Instructions
 
 ### Install required software
-1. Python (via Anaconda): https://www.anaconda.com/download/
-2. [Install](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git) and [setup](https://git-scm.com/book/en/v2/Getting-Started-First-Time-Git-Setup) git 
+1. Download Python via Anaconda: https://www.anaconda.com/download/
+2. [Install](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git) and [setup](https://git-scm.com/book/en/v2/Getting-Started-First-Time-Git-Setup) git. 
 
 #### Install the application
-```git clone [this repository]```
+[Clone](https://git-scm.com/book/en/v2/Git-Basics-Getting-a-Git-Repository) this repository with git.
 
 #### Install pip
 Download [get-pip.py](https://bootstrap.pypa.io/get-pip.py) to a folder on your computer. Open a command (cmd) prompt window (go to Windows search bar and search for cmd), terminal window (Mac search terminal) or bash (Linux) and navigate to the folder containing get-pip.py. Then run `python get-pip.py`. This will install pip.
