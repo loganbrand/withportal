@@ -20,6 +20,7 @@ import pandas as pd
 import numpy as np
 import os
 import base64
+import json
 
 import features
 from support import appProfiles 
@@ -33,6 +34,10 @@ sanedi_encoded = base64.b64encode(open(sanedi_logo, 'rb').read())
 # Get mapbox token
 mapbox_access_token = 'pk.eyJ1Ijoic2FpbnRseXZpIiwiYSI6ImNqZHZpNXkzcjFwejkyeHBkNnp3NTkzYnQifQ.Rj_C-fOaZXZTVhTlliofMA'
 
+# Get load profile data from disk
+print('...loading load profile data...')
+profiles = appProfiles(1994,2014)  
+
 # Load datasets
 print('...loading socio demographic data...')
 ids = features.loadID()
@@ -42,10 +47,6 @@ loc_summary.reset_index(inplace=True)
 loc_summary.rename(columns={'AnswerID':'# households'}, inplace=True)
 #load socio-demographic feature frame
 sd = features.socio_demographics()
-                            
-# Get load profile data from disk
-print('...loading load profile data...')
-profiles = appProfiles(1994,2014)  
 
 print('Your app is starting now. Visit 127.0.0.1:8050 in your browser')
 
@@ -133,7 +134,7 @@ app.layout = html.Div([
                        'float':'left'}
             ),
 
-########~~~~~~~~Specify Socio-demographic Indicators~~~~~~~~~########
+#######~~~~~~~~Specify Socio-demographic Indicators~~~~~~~~~########
 
             html.Div([
                 html.H5('Specify Socio-demographic Indicators'
@@ -232,7 +233,7 @@ app.layout = html.Div([
         ),
         html.Hr(),
 
-################~View Load Profiles~###############
+#################~View Load Profiles~###############
 
         html.Div([
             html.H3('View Load Profiles'),
@@ -262,7 +263,7 @@ app.layout = html.Div([
         ]),                        
         html.Hr(),
 
-################~Explore Profile Meta-data~###############
+###############~Explore Profile Meta-data~###############
 
         html.Div([
             html.H3('Explore Profile Meta-data'),
@@ -305,7 +306,7 @@ app.layout = html.Div([
             html.Div([
                 html.H5('Location Output Summary'),
                 dt.DataTable(
-                    id='output-location-list',
+                    id='output-location-summary',
                     rows=[{}], # initialise the rows
                     row_selectable=False,
                     columns = ['Year','Province','Municipality','LocName','# households'],
@@ -324,13 +325,13 @@ app.layout = html.Div([
                        'width':'45%',
                        'float':'right'}
             ),
-########~~~~~~~~section end~~~~~~~~########
+#######~~~~~~~~section end~~~~~~~~########
         ],
             className='row'
         ),
     ],
 
-###############################
+##############################
 
     #Set the style for the overall dashboard
     style={
@@ -347,45 +348,60 @@ app.layout = html.Div([
 )
 
 #Define outputs
+
 @app.callback(
-        Output('output-location-list','rows'),
-        [Input('input-years','value')]
-        )
-def update_locations(input_years):
-    dff = pd.DataFrame()
-    for y in range(input_years[0], input_years[1]+1):
-        df = loc_summary.loc[loc_summary.Year.astype(int) == y, ['Year','Province','Municipality','LocName', '# households']]
-        dff = dff.append(df)
-    dff.reset_index(inplace=True, drop=True)
-    return dff.to_dict('records')
-            
+        Output('sd-features','children'),
+        [Input('input-electrified', 'value'),
+         Input('input-electrified', 'max'),
+         Input('input-income', 'value'),
+         Input('input-income', 'max'),
+         Input('input-appliances', 'value')
+        ])
+def socio_demographics(electrified, electrified_max, income, income_max, appliances):
+
+    if electrified[1] == electrified_max:
+        electrified[1] = sd.years_electrified.max()
+    if income[1] == income_max:
+        income[1] = sd.monthly_income.max()
+        
+    sd_features = sd
+    
+    return sd_features.to_json(date_format='iso', orient='split')
+
 @app.callback(
-        Output('output-search-word-questions','rows'),
-        [Input('input-search-word','value')
-        ]
-        )
-def update_questions(search_word):
-    df = features.searchQuestions(search_word)[['Question','QuestionaireID','Datatype']]
-    dff = df.loc[df['QuestionaireID'].isin([3,6])]
-    dff.loc[:,'Survey'] = dff.QuestionaireID.map({3:'2000-2014',6:'1994-1999'})
-    dff.drop(columns='QuestionaireID', inplace=True)
-#    questions = pd.DataFrame(dff['Question'])
-    return dff.to_dict('records')
+        Output('selected-ids','children'),
+        [Input('sd-features','children'),
+         Input('input-years','value')
+        ])
+def selected_ids(sd_features, input_years):
+    
+    sd_df = pd.read_json(sd_features, orient='split')
+    sd_df = sd
+    sd_data = sd_df[sd_df.AnswerID!=0]
+    id_select = sd_data.merge(ids, on='AnswerID', how='inner')
+    yrs = list(range(input_years[0],input_years[1]+1))
+    output = id_select[id_select.Year.isin(yrs)].reset_index(drop=True)
+    
+    return output.to_json(date_format='iso', orient='split')
 
 @app.callback(
         Output('map','figure'),        
-        [Input('output-location-list','rows')]
-        )
+        [Input('selected-ids','children')
+        ])
+def update_map(selected_ids):
 
-def update_map(input_locations):
-
-    loc_list = pd.DataFrame(input_locations)
-    keys=['Year','LocName']
-    i_loc = loc_list.set_index(keys).index
-    i_site = loc_summary.set_index(keys).index
+#    loc_list = pd.DataFrame(input_locations)
+#    keys=['Year','LocName']
+#    i_loc = loc_list.set_index(keys).index
+#    i_site = loc_summary.set_index(keys).index
+#    georef = loc_summary[i_site.isin(i_loc)]
     
-    georef = loc_summary[i_site.isin(i_loc)]
-        
+    ids_df = pd.read_json(selected_ids, orient='split')
+    
+    georef = pd.pivot_table(ids_df, values = ['AnswerID'], index = ['Year','LocName','Lat','Long','Municipality','Province'],aggfunc = np.count_nonzero)
+    georef.reset_index(inplace=True)
+    georef.rename(columns={'AnswerID':'# households'}, inplace=True)
+          
     traces = []
     for y in range(georef.Year.min(), georef.Year.max()+1):
         lat = georef.loc[(georef.Year==y), 'Lat']
@@ -425,46 +441,42 @@ def update_map(input_locations):
                         t = 20,
                         b = 30
                 ),
-                showlegend=False
+                showlegend=True
             )
     )
     return figure
 
 @app.callback(
-        Output('features','children'),
-        [Input('input-electrified', 'value'),
-         Input('input-electrified', 'max'),
-         Input('input-income', 'value'),
-         Input('input-income', 'max'),
-         Input('input-appliances', 'value')
-        ]
-        )
-def socio_demographics(electrified, electrified_max, income, income_max, appliances):
+    Output('map-select','children'),
+    [Input('map','selectedData'),
+     Input('selected-ids','children')
+     ])
+def map_data(selected_data, selected_ids):
 
-    if electrified[1] == electrified_max:
-        electrified[1] = sd.years_electrified.max()
-    if income[1] == income_max:
-        income[1] = sd.monthly_income.max()
-        
-    sd
+    ids_df = pd.read_json(selected_ids, orient='split')
     
-    return sd
+    if len(selected_data['points'])<=0:
+        output = ids
+    else:
+        geos = pd.DataFrame(selected_data['points'])
+        geos.drop_duplicates('text',inplace=True)
+        geos['LocName'] = geos['text'].apply(lambda x: x.split(',')[0])
+        geos['Municipality'] = geos['text'].apply(lambda x: x.split(',')[1])
+        output = ids_df[ids_df.LocName.isin(geos.LocName)].reset_index(drop=True)
+                
+    return output.to_json(date_format='iso', orient='split')
    
 @app.callback(
         Output('graph-profiles','figure'),
-        [Input('output-location-list','rows'),
-         Input('input-daytype','value')
-#         Input('profiles-button','n_clicks')
-#         Input('preload-profiles','children')
-        ]
-        )
-def graph_profiles(input_locations, day_type):#, preload):   
+        [Input('input-daytype','value'),
+         Input('map-select','children'),
+        ])
+def graph_profiles(day_type, map_select):  
     
-#TODO first filter by answerID based on questions, then by profileid
-    loc_list = pd.DataFrame(input_locations)
-    locs = loc_list.LocName.unique()
-
-    g = profiles[(profiles.ProfileID_i.isin(ids.loc[(ids.LocName.isin(locs)),'ProfileID']))]
+    map_df = pd.read_json(map_select, orient='split')
+    id_select = map_df[map_df.AnswerID!=0]
+    
+    g = profiles[profiles.ProfileID_i.isin(id_select.ProfileID)]
     gg = g.groupby(['daytype','season','hour'])['kw_mean'].describe().reset_index()
     dt_mean = gg[(gg.daytype==day_type)]
 
@@ -502,6 +514,33 @@ def graph_profiles(input_locations, day_type):#, preload):
     fig = go.Figure(data=traces, layout=layout)   
     
     return fig
+
+@app.callback(
+        Output('output-location-summary','rows'),
+        [Input('map-select','children'),
+        ])
+def location_summary(map_select):
+    
+    map_df = pd.read_json(map_select, orient='split')
+
+    output = pd.pivot_table(map_df, values = ['AnswerID'], index = ['Year','LocName','Lat','Long','Municipality','Province'],aggfunc = np.count_nonzero)
+    output.reset_index(inplace=True)
+    output.rename(columns={'AnswerID':'# households'}, inplace=True)
+                                
+    return output.to_dict('records')
+            
+@app.callback(
+        Output('output-search-word-questions','rows'),
+        [Input('input-search-word','value')
+        ])
+def update_questions(search_word):
+    df = features.searchQuestions(search_word)[['Question','QuestionaireID','Datatype']]
+    dff = df.loc[df['QuestionaireID'].isin([3,6])]
+    dff.loc[:,'Survey'] = dff.QuestionaireID.map({3:'2000-2014',6:'1994-1999'})
+    dff.drop(columns='QuestionaireID', inplace=True)
+#    questions = pd.DataFrame(dff['Question'])
+    return dff.to_dict('records')
+
 
 # Run app from script. Go to 127.0.0.1:8050 to view
 if __name__ == '__main__':
