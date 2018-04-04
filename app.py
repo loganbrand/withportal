@@ -252,17 +252,6 @@ app.layout = html.Div([
             dcc.Graph(
                 id='graph-profiles'
             ),
-#                dcc.RangeSlider(
-#                    id = 'input-months',
-#                    marks=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
-##                    min=0,
-##                    max=11,
-##                    step=1,
-##                    included=True,
-##                    value= [5,7],
-##                    updatemode='drag',
-##                    dots = True
-##                )       
         ]),                        
         html.Hr(),
 
@@ -313,7 +302,7 @@ app.layout = html.Div([
                     rows=[{}], # initialise the rows
                     row_selectable=False,
                     columns = ['Year','Province','Municipality','LocName','# households'],
-                    filterable=True,
+                    filterable=False,
                     sortable=True,
                     column_widths=100,
                     min_height = 450,
@@ -366,9 +355,11 @@ def socio_demographics(electrified, electrified_max, income, income_max, applian
         electrified[1] = sd.years_electrified.max()
     if income[1] == income_max:
         income[1] = sd.monthly_income.max()
-        
-    sd_features = sd
     
+    sd1 = sd[sd.monthly_income.isin(range(int(income[0]),int(income[1])+1))]
+    sd2 = sd1[sd1.years_electrified.isin(range(int(electrified[0]),int(electrified[1])+1))]
+    sd_features = sd2.dropna(subset=appliances)
+
     return sd_features.to_json(date_format='iso', orient='split')
 
 @app.callback(
@@ -379,9 +370,7 @@ def socio_demographics(electrified, electrified_max, income, income_max, applian
 def selected_ids(sd_features, input_years):
     
     sd_df = pd.read_json(sd_features, orient='split')
-    sd_df = sd
-    sd_data = sd_df[sd_df.AnswerID!=0]
-    id_select = sd_data.merge(ids, on='AnswerID', how='inner')
+    id_select = sd_df.merge(ids, on='AnswerID', how='inner')
     yrs = list(range(input_years[0],input_years[1]+1))
     output = id_select[id_select.Year.isin(yrs)].reset_index(drop=True)
     
@@ -392,32 +381,27 @@ def selected_ids(sd_features, input_years):
         [Input('selected-ids','children')
         ])
 def update_map(selected_ids):
-
-#    loc_list = pd.DataFrame(input_locations)
-#    keys=['Year','LocName']
-#    i_loc = loc_list.set_index(keys).index
-#    i_site = loc_summary.set_index(keys).index
-#    georef = loc_summary[i_site.isin(i_loc)]
     
     ids_df = pd.read_json(selected_ids, orient='split')
     
     georef = pd.pivot_table(ids_df, values = ['AnswerID'], index = ['Year','LocName','Lat','Long','Municipality','Province'],aggfunc = np.count_nonzero)
     georef.reset_index(inplace=True)
     georef.rename(columns={'AnswerID':'# households'}, inplace=True)
-          
+                           
     traces = []
     for y in range(georef.Year.min(), georef.Year.max()+1):
         lat = georef.loc[(georef.Year==y), 'Lat']
         lon = georef.loc[(georef.Year==y), 'Long']
-        text = georef.loc[(georef.Year==y), 'LocName'] + ', ' + georef.loc[(georef.Year==y), 'Municipality']
-#        marker_size = site_geo.loc[site_geo.Year==y,'# households']
+        text = georef.loc[(georef.Year==y), '# households'].astype(str) + ' household surveys</br>'+ georef.loc[(georef.Year==y), 'LocName'] + ', ' + georef.loc[(georef.Year==y), 'Municipality']
+        marker_size = georef.loc[georef.Year==y,'# households']**(1/2.5)*3
+        marker_size.replace([0,1,2,3,4, 5], 6, inplace=True)
         trace=go.Scattermapbox(
                 name=y,
                 lat=lat,
                 lon=lon,
                 mode='markers',
                 marker=go.Marker(
-                    size=12
+                    size=marker_size
                 ),
                 text=text,
             )
@@ -431,8 +415,8 @@ def update_map(selected_ids):
                     accesstoken=mapbox_access_token,
                     bearing=0,
                     center=dict(
-                        lat=-29.1,#loc_summary[loc_summary.LocName=='Ikgomotseng'] ['Lat'].unique()[0],
-                        lon=25#loc_summary[loc_summary.LocName=='Ikgomotseng']['Long'].unique()[0]
+                        lat=-29.1,
+                        lon=25
                     ),
                     pitch=0,
                     zoom=4.32,
@@ -444,7 +428,7 @@ def update_map(selected_ids):
                         t = 20,
                         b = 30
                 ),
-                showlegend=True
+                showlegend=False
             )
     )
     return figure
@@ -458,13 +442,12 @@ def map_data(selected_data, selected_ids):
 
     ids_df = pd.read_json(selected_ids, orient='split')
     
-    if len(selected_data['points'])<=0:
-        output = ids
+    geos = pd.DataFrame(selected_data['points'])
+    if geos.empty==True:
+        output = ids_df
     else:
-        geos = pd.DataFrame(selected_data['points'])
         geos.drop_duplicates('text',inplace=True)
         geos['LocName'] = geos['text'].apply(lambda x: x.split(',')[0])
-        geos['Municipality'] = geos['text'].apply(lambda x: x.split(',')[1])
         output = ids_df[ids_df.LocName.isin(geos.LocName)].reset_index(drop=True)
                 
     return output.to_json(date_format='iso', orient='split')
@@ -541,7 +524,6 @@ def update_questions(search_word):
     dff = df.loc[df['QuestionaireID'].isin([3,6])]
     dff.loc[:,'Survey'] = dff.QuestionaireID.map({3:'2000-2014',6:'1994-1999'})
     dff.drop(columns='QuestionaireID', inplace=True)
-#    questions = pd.DataFrame(dff['Question'])
     return dff.to_dict('records')
 
 
