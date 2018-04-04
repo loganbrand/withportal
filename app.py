@@ -231,6 +231,9 @@ app.layout = html.Div([
         ],
             className='row',
         ),
+        html.Div(id='sd-features', style={'display': 'none'}),
+        html.Div(id='selected-ids', style={'display': 'none'}),
+        html.Div(id='map-select', style={'display': 'none'}),
         html.Hr(),
 
 #################~View Load Profiles~###############
@@ -252,14 +255,14 @@ app.layout = html.Div([
 #                dcc.RangeSlider(
 #                    id = 'input-months',
 #                    marks=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
-#                    min=0,
-#                    max=11,
-#                    step=1,
-#                    included=True,
-#                    value= [5,7],
-#                    updatemode='drag',
-#                    dots = True
-#                )       
+##                    min=0,
+##                    max=11,
+##                    step=1,
+##                    included=True,
+##                    value= [5,7],
+##                    updatemode='drag',
+##                    dots = True
+##                )       
         ]),                        
         html.Hr(),
 
