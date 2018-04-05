@@ -207,7 +207,8 @@ app.layout = html.Div([
                                      {'label': 'Washing machine', 'value': 'washing_machine'},
                             ],
                             placeholder="Select appliances",
-                            multi=True
+                            multi=True,
+                            value = []
                         )
                     ],
                     style={'margin-bottom':'50',
@@ -234,6 +235,10 @@ app.layout = html.Div([
         html.Div(id='sd-features', style={'display': 'none'}),
         html.Div(id='selected-ids', style={'display': 'none'}),
         html.Div(id='map-select', style={'display': 'none'}),
+#Uncomment to test input variables
+#        html.Div([
+#            html.Pre(id='test'),
+#        ], className='three columns'),
         html.Hr(),
 
 #################~View Load Profiles~###############
@@ -297,20 +302,24 @@ app.layout = html.Div([
 
             html.Div([
                 html.H5('Location Output Summary'),
-                dt.DataTable(
-                    id='output-location-summary',
-                    rows=[{}], # initialise the rows
-                    row_selectable=False,
-                    columns = ['Year','Province','Municipality','LocName','# households'],
-                    filterable=False,
-                    sortable=True,
-                    column_widths=100,
-                    min_height = 450,
-                    resizable=True,
-                    selected_row_indices=[],),
-                html.P('"# households" is the number of households for which socio-demographic survey data is available',
-                       style={'font-style': 'italic'}
-                       )     
+                html.Div([
+                    dt.DataTable(
+                        id='output-location-summary',
+                        rows=[{}], # initialise the rows
+                        row_selectable=False,
+                        columns = ['Year','Province','Municipality','LocName','# households'],
+                        filterable=False,
+                        sortable=True,
+                        column_widths=100,
+                        min_height = 450,
+                        resizable=True,
+                        selected_row_indices=[]),
+                    html.P('"# households" is the number of households for which socio-demographic survey data is available',
+                           style={'font-style': 'italic'}
+                           )
+                ],
+                    style={'margin-top':'57'}
+                )
             ],
                 className='columns',
                 style={'margin-bottom':'10',
@@ -340,6 +349,13 @@ app.layout = html.Div([
 )
 
 #Define outputs
+                    
+@app.callback(
+        Output('test','children'),
+        [Input('input-appliances','value')])
+def selected_ids(input):
+    
+    return json.dumps(input, indent=2)
 
 @app.callback(
         Output('sd-features','children'),
@@ -358,7 +374,10 @@ def socio_demographics(electrified, electrified_max, income, income_max, applian
     
     sd1 = sd[sd.monthly_income.isin(range(int(income[0]),int(income[1])+1))]
     sd2 = sd1[sd1.years_electrified.isin(range(int(electrified[0]),int(electrified[1])+1))]
-    sd_features = sd2.dropna(subset=appliances)
+    try:
+        sd_features = sd2.dropna(subset=appliances)
+    except:
+        sd_features = sd
 
     return sd_features.to_json(date_format='iso', orient='split')
 
@@ -393,7 +412,7 @@ def update_map(selected_ids):
         lat = georef.loc[(georef.Year==y), 'Lat']
         lon = georef.loc[(georef.Year==y), 'Long']
         text = georef.loc[(georef.Year==y), '# households'].astype(str) + ' household surveys</br>'+ georef.loc[(georef.Year==y), 'LocName'] + ', ' + georef.loc[(georef.Year==y), 'Municipality']
-        marker_size = georef.loc[georef.Year==y,'# households']**(1/2.5)*3
+        marker_size = georef.loc[georef.Year==y,'# households']**(1/2.5)*2.7
         marker_size.replace([0,1,2,3,4, 5], 6, inplace=True)
         trace=go.Scattermapbox(
                 name=y,
@@ -441,16 +460,18 @@ def update_map(selected_ids):
 def map_data(selected_data, selected_ids):
 
     ids_df = pd.read_json(selected_ids, orient='split')
-    
-    geos = pd.DataFrame(selected_data['points'])
-    if geos.empty==True:
-        output = ids_df
-    else:
-        geos.drop_duplicates('text',inplace=True)
-        geos['LocName'] = geos['text'].apply(lambda x: x.split(',')[0])
+
+    try:    
+        geos = pd.DataFrame(selected_data['points'])
+        geos['LocName'] = geos['text'].apply(lambda x: x.split(',')[0].split('>')[1])
+        geos.drop_duplicates('LocName',inplace=True)
         output = ids_df[ids_df.LocName.isin(geos.LocName)].reset_index(drop=True)
+        
+    except:
+        output = ids_df
                 
     return output.to_json(date_format='iso', orient='split')
+
    
 @app.callback(
         Output('graph-profiles','figure'),
