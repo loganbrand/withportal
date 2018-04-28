@@ -110,14 +110,14 @@ app.layout = html.Div([
                     style={'margin-left':'0'}
                 ),
                 html.Div([
-                    dcc.RangeSlider(
+                    dcc.Slider(
                         id = 'input-years',
                         marks={i: i for i in range(1994, 2015, 2)},
                         min=1994,
                         max=2014,
                         step=1,
-                        included=True,
-                        value= [1994, 2014],
+                        included=False,
+                        value= 2010,#[1994, 2014],
                         updatemode='drag',
                         dots = True
                     )       
@@ -147,7 +147,7 @@ app.layout = html.Div([
                     html.Div([
                         dcc.RangeSlider(
                             id = 'input-electrified',
-                            marks= list(range(0, 16, 1)),#{i: ''.format(i) for i in range(0, 15, 1)},
+                            marks= list(range(0, 15, 1)) + ['+15'],
                             min=0,
                             max=15,
                             included=True,
@@ -350,12 +350,12 @@ app.layout = html.Div([
 
 #Define outputs
                     
-@app.callback(
-        Output('test','children'),
-        [Input('input-appliances','value')])
-def selected_ids(input):
-    
-    return json.dumps(input, indent=2)
+#@app.callback(
+#        Output('test','children'),
+#        [Input('input-appliances','value')])
+#def selected_ids(input):
+#    
+#    return json.dumps(input, indent=2)
 
 @app.callback(
         Output('sd-features','children'),
@@ -390,7 +390,8 @@ def selected_ids(sd_features, input_years):
     
     sd_df = pd.read_json(sd_features, orient='split')
     id_select = sd_df.merge(ids, on='AnswerID', how='inner')
-    yrs = list(range(input_years[0],input_years[1]+1))
+    yrs = [input_years]
+#    yrs = list(range(input_years[0],input_years[1]+1))
     output = id_select[id_select.Year.isin(yrs)].reset_index(drop=True)
     
     return output.to_json(date_format='iso', orient='split')
