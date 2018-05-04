@@ -20,6 +20,7 @@ conda install -c conda-forge dash
 conda install -c conda-forge dash-renderer
 conda install -c conda-forge dash-html-components
 conda install -c conda-forge dash-core-components
+pip install dash-table-experiments
 pip install ckanapi
 ```
 ## 2. Request Data Access
