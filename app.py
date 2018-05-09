@@ -20,7 +20,6 @@ import pandas as pd
 import numpy as np
 import os
 import base64
-import json
 
 import features
 from support import appProfiles 
