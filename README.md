@@ -15,12 +15,13 @@ Download [get-pip.py](https://bootstrap.pypa.io/get-pip.py) to a folder on your 
 #### C) Install pre-requisite packages
 Copy and paste the following into the Anaconda prompt/terminal/bash, and hit enter. You must have an internet connection for this to work.
 ```
-pip install feather-format
+conda install -c conda-forge feather-format
+conda install -c conda-forge dash 
+conda install -c conda-forge dash-renderer
+conda install -c conda-forge dash-html-components
+conda install -c conda-forge dash-core-components
+pip install dash-table-experiments
 pip install ckanapi
-pip install dash
-pip install dash-renderer
-pip install dash-html-components
-pip install dash-core-components
 ```
 ## 2. Request Data Access
 #### A) Get data API-key
