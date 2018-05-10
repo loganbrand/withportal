@@ -40,12 +40,15 @@ profiles = appProfiles(1994,2014)
 # Load datasets
 print('...loading socio demographic data...')
 ids = features.loadID()
+
 #a little bit of data wrangling
 loc_summary = pd.pivot_table(ids, values = ['AnswerID'], index = ['Year','LocName','Lat','Long','Municipality','Province'],aggfunc = np.count_nonzero)
 loc_summary.reset_index(inplace=True)
 loc_summary.rename(columns={'AnswerID':'# households'}, inplace=True)
+
 #load socio-demographic feature frame
-sd = features.socio_demographics()
+appliances = ['fridge freezer','geyser','heater','hotplate','iron','kettle','microwave','3 plate', '4 plate','tv','washing machine']
+sd = features.socio_demographics(appliances)
 
 print('Your app is starting now. Visit 127.0.0.1:8050 in your browser')
 
