@@ -128,7 +128,7 @@ def searchAnswers(search):
             
     return result
 
-def buildFeatureFrame(searchlist, questionaires, cols=None):
+def buildFeatureFrame(searchlist, year=None, cols=None):
     """
     This function creates a dataframe containing the data for a set of selected features for a given year.
     
@@ -138,40 +138,59 @@ def buildFeatureFrame(searchlist, questionaires, cols=None):
     else:
         searchlist = [searchlist]
         
-    if isinstance(questionaires, list):
-        pass
+    if cols is None:
+        search = dict(zip(searchlist, searchlist))
     else:
-        questionaires = [questionaires]
+        search = dict(zip(searchlist, cols))
+    
+    #filter AnswerIDs by year          
+    ids = loadID()
+    if year is None:
+        sub_ids = ids[ids.AnswerID!=0]
+    else:
+        sub_ids = ids[(ids.AnswerID!=0)&(ids.Year==year)]
     
     #generate feature frame
     result = pd.DataFrame(columns=['AnswerID','QuestionaireID'])        
-    for s in searchlist:
+    for s in search.keys():
         d = searchAnswers(s)
-        ans = d[d.QuestionaireID.isin(questionaires)]
+        ans = d[(d.AnswerID.isin(sub_ids.AnswerID)) & (d.QuestionaireID < 10)] # remove non-domestic results 
         ans = ans.dropna(axis=1, how='all')
-        
-        result = result.merge(ans, how='outer')
-    
     #set feature frame column names
-    if cols != None:
-        if isinstance(cols, list):
+        if len(ans.columns[2:])==1:
+            ans.columns = ['AnswerID','QuestionaireID'] + [search.get(s)]        
+
+        try:    
+            result = result.merge(ans, how='outer')
+        except Exception:
             pass
-        else:
-            cols = [cols]
-        result.columns = ['AnswerID','QuestionaireID'] + cols
-        
+                          
     return result
 
-def socio_demographics():
+def socio_demographics(appliances=None, other_socios=None):
     
-    appliances = ['fridge freezer','geyser','heater','hotplate','iron','kettle','microwave','3 plate', '4 plate','tv','washing machine']    
-    features6 = ['years','monthly income'] + appliances
-    features3 = ['electricity','deductions'] + ['{}Number'.format(i) for i in appliances]     
-    cols = ['years_electrified','monthly_income'] + [i.replace(' ','_') for i in appliances]
-    
-    f6 = buildFeatureFrame(features6, 6, cols) #generate feature frame for years pre 1999
-    f3 = buildFeatureFrame(features3, 3, cols) #generate feature frame for years post 1999    
-    ff = f3.append(f6)
+    if appliances is None:
+        appliances = []
+    if other_socios is None:
+        other_socios = []
+    features6 = ['years','monthly income'] + appliances + other_socios
+    features3 = ['electricity','deductions'] + ['{}Number'.format(i) for i in appliances] + other_socios     
+    cols = ['years_electrified','monthly_income'] + [i.replace(' ','_') for i in appliances] + [i.replace(' ','_') for i in other_socios]
+
+    ff = pd.DataFrame(columns= ['AnswerID','QuestionaireID'] + cols)
+    for year in range(1994, 2000):
+        try:
+            ff = ff.append(buildFeatureFrame(features6, year, cols)) #generate feature frame for years pre 1999
+        except Exception:
+            print(year)
+            pass
+        
+    for year in range(2000, 2015):
+        try:
+            ff = ff.append(buildFeatureFrame(features3, year, cols)) #generate feature frame for years post 1999
+        except Exception:
+            pass                
+    ff = ff[['AnswerID','QuestionaireID'] + cols]
     
     return ff
 
