@@ -30,9 +30,9 @@ os.makedirs(feather_adtd, exist_ok=True)
 def appData():
     
     #fetch tables from energydata.uct.ac.za
-    apikey = input('Enter your APIKEY from http://energydata.uct.ac.za/user/YOUR_USERNAME: ')
-    headers = {'Authorization':apikey}
-    ckan = ckanapi.RemoteCKAN('http://energydata.uct.ac.za/', apikey=apikey, get_only=True)
+#    apikey = input('Enter your APIKEY from http://energydata.uct.ac.za/user/YOUR_USERNAME: ')
+    headers = {'Authorization':f5e565d2-04e8-40b1-99b7-32564a468299}
+    ckan = ckanapi.RemoteCKAN('http://energydata.uct.ac.za/', apikey=f5e565d2-04e8-40b1-99b7-32564a468299, get_only=True)
 
     tables = ckan.action.package_show(id='dlr-database-tables-94-14')        
     for i in range(0, len(tables['resources'])):
